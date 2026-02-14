@@ -2,65 +2,14 @@
 import { ref } from 'vue'
 import Navbar from '../components/Nav-bar.vue'
 import Map from '../components/Map.vue'
+import PlateNumberInput from '../components/PlateNumberInput.vue'
 
 const activePanel = ref<'none' | 'search' | 'map'>('none')
 const plateNumber = ref('')
-const showColorPicker = ref(false)
-const colorHoverLabel = ref('')
-const mouseX = ref(0)
-const mouseY = ref(0)
-const colors = [
-  { value: 'yellow', text: 'לוחית צהובה (רגילה)' },
-  { value: 'red', text: 'לוחית אדומה (משטרה)' },
-  { value: 'black', text: 'לוחית שחורה (צבא)' },
-  { value: 'blue', text: 'לוחית כחולה (משטרה צבאית)' },
-]
-const selectedColor = ref(colors[0])
+const selectedColor = ref({ value: 'yellow', text: 'לוחית צהובה (רגילה)' })
 
 function togglePanels(panel: 'search' | 'map') {
   activePanel.value = panel
-}
-
-function controlSearchInput(event: Event) {
-  const input = event.target as HTMLInputElement
-  input.value = input.value.replace(/[^0-9]/g, '')
-
-  switch (selectedColor.value?.value) {
-    case 'yellow':
-      input.maxLength = 8
-      break
-    case 'red':
-    case 'black':
-      input.maxLength = 7
-      break
-    case 'blue':
-      input.maxLength = 3
-      break
-  }
-}
-
-function toggleColorPicker() {
-  showColorPicker.value = !showColorPicker.value
-}
-
-function selectColor(color: any) {
-  selectedColor.value = color
-  toggleColorPicker()
-  clearHoverLabel()
-  plateNumber.value = ''
-}
-
-function setHoverLabel(label: any) {
-  colorHoverLabel.value = label
-}
-
-function updateMousePosition(e: MouseEvent) {
-  mouseX.value = e.clientX + 12
-  mouseY.value = e.clientY + 12
-}
-
-function clearHoverLabel() {
-  colorHoverLabel.value = ''
 }
 </script>
 
@@ -94,100 +43,14 @@ function clearHoverLabel() {
       </div>
 
       <div class="home-panel">
-        <div v-if="activePanel === 'search'" class="panel panel-search">
-          <div style="display: flex; gap: 10px; align-items: center">
-            <input
-              v-model="plateNumber"
-              type="text"
-              class="form-control"
-              placeholder="הקלידו מספר רכב ללא קווים ואותיות"
-              @input="controlSearchInput"
-              style="width: 300px; height: 45px"
-            />
-            <div style="position: relative">
-              <button
-                type="button"
-                @click="toggleColorPicker"
-                @mousemove="updateMousePosition"
-                @mouseover="setHoverLabel(selectedColor?.text)"
-                @mouseleave="clearHoverLabel()"
-                :style="{
-                  backgroundColor: selectedColor?.value,
-                  width: '45px',
-                  height: '45px',
-                  border: '3px solid #ccc',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                }"
-              ></button>
-              <div
-                v-if="showColorPicker"
-                style="
-                  position: absolute;
-                  right: 0;
-                  background: whitesmoke;
-                  border: 1px solid #ccc;
-                  padding: 10px;
-                  border-radius: 12px;
-                  display: flex;
-                  gap: 5px;
-                  flex-wrap: wrap;
-                  width: 160px;
-                "
-              >
-                <button
-                  v-for="color in colors"
-                  :key="color.value"
-                  type="button"
-                  @click="selectColor(color)"
-                  @mousemove="updateMousePosition"
-                  @mouseover="setHoverLabel(color.text)"
-                  @mouseleave="clearHoverLabel()"
-                  :style="{
-                    backgroundColor: color.value,
-                    width: '30px',
-                    height: '30px',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                  }"
-                ></button>
-              </div>
-              <div
-                v-if="colorHoverLabel"
-                :style="{
-                  position: 'fixed',
-                  left: mouseX + 'px',
-                  top: mouseY + 'px',
-                  background: 'whitesmoke',
-                  color: 'black',
-                  fontWeight: 'bold',
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
-                  whiteSpace: 'nowrap',
-                  pointerEvents: 'none',
-                }"
-              >
-                {{ colorHoverLabel }}
-              </div>
-            </div>
-          </div>
+        <div v-if="activePanel === 'search'">
+          <PlateNumberInput
+            v-model:plateNumber="plateNumber"
+            v-model:selectedColor="selectedColor"
+          />
         </div>
-        <div v-if="activePanel === 'map'" class="panel panel-map">
-          <div
-            id="map-placeholder"
-            style="
-              width: 100%;
-              background: #f8f9fa;
-              border: 1px dashed #ced4da;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-            "
-          >
-            <Map />
-          </div>
+        <div v-if="activePanel === 'map'" class="map-panel">
+          <Map />
         </div>
       </div>
     </section>
@@ -210,7 +73,7 @@ main {
   color: #d63333;
   gap: 1rem;
   padding: 7rem 2rem 2rem 2rem;
-  max-width: 900px;
+  max-width: 720px;
 }
 
 .home-view h1 {
@@ -218,8 +81,8 @@ main {
   margin-bottom: 0.5rem;
 }
 
-.home-view h1:last-of-type {
-  margin-bottom: 5rem;
+.home-view h1:first-of-type {
+  margin-bottom: 3rem;
 }
 
 .home-actions {
@@ -231,6 +94,14 @@ main {
   margin-top: 1rem;
 }
 
+.btn-warning:hover {
+  background-color: #e0a800;
+}
+
+.btn-info:hover {
+  background-color: #0bb8d8;
+}
+
 .home-panel {
   margin-top: 1.5rem;
   width: 100%;
@@ -238,21 +109,7 @@ main {
   justify-content: center;
 }
 
-.panel {
-  max-width: 720px;
-  width: 100%;
-}
-
-.panel-search .form-control {
-  direction: ltr;
-}
-
-.panel-search {
-  display: flex;
-  justify-content: center;
-}
-
-input::placeholder {
-  text-align: right;
+.map-panel {
+  width: 450px;
 }
 </style>

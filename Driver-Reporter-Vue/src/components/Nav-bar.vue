@@ -1,7 +1,7 @@
 <script setup lang="ts"></script>
 
 <template>
-  <nav class="navbar fixed-top navbar-expand-lg bg-body-tertiary" data-bs-theme="dark" dir="rtl">
+  <nav class="navbar fixed-top navbar-expand-lg navbar-custom" data-bs-theme="dark" dir="rtl">
     <div class="container-fluid justify-content-start">
       <router-link to="/" class="navbar-brand" active-class="fw-bold">
         <img src="../assets/icons/favicon.png" width="30" height="30" alt="driver" />
@@ -19,6 +19,10 @@
         <img src="../assets/icons/plus.png" width="20" height="20" alt="statistics" />
         דיווח חדש
       </router-link>
+      <router-link to="/signin" class="navbar-brand signin-box" active-class="fw-bold"> כניסה </router-link>
+      <router-link to="/signup" class="navbar-brand signup-box" active-class="fw-bold">
+        הרשמה
+      </router-link>
     </div>
   </nav>
 </template>
@@ -26,6 +30,15 @@
 <style scoped>
 .navbar {
   border-radius: 0;
+}
+
+.container-fluid {
+  gap: 0.5rem;
+}
+
+.navbar-custom {
+  --bs-navbar-bg: #0f172a;
+  background-color: var(--bs-navbar-bg) !important;
 }
 
 .navbar-brand {
@@ -37,9 +50,8 @@
 }
 
 .navbar-brand:hover {
-  background-color: gray;
+  background-color: #ffffff14;
   border-radius: 6px;
-  text-decoration: none;
 }
 
 .navbar-brand img {
@@ -58,5 +70,14 @@
 .navbar-brand.report-box:hover {
   background-color: #157347;
   text-decoration: none;
+}
+
+.signup-box {
+  background-color: transparent;
+  color: #fff !important;
+  border: 1px solid #fff;
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem;
+  margin-inline: 0.25rem;
 }
 </style>
