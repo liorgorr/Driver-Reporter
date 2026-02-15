@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import Navbar from '../components/Nav-bar.vue'
 import Map from '../components/Map.vue'
 import PlateNumberInput from '../components/PlateNumberInput.vue'
@@ -7,6 +7,30 @@ import PlateNumberInput from '../components/PlateNumberInput.vue'
 const activePanel = ref<'none' | 'search' | 'map'>('none')
 const plateNumber = ref('')
 const selectedColor = ref({ value: 'yellow', text: 'לוחית צהובה (רגילה)' })
+
+const platePreviewStyle = computed(() => {
+  const color = selectedColor.value.value
+  const isDark = color === 'black' || color === 'blue' || color === 'red'
+
+  return {
+    backgroundColor: color,
+    borderColor: isDark ? 'white' : '#1a1a1a',
+    color: isDark ? 'white' : 'black',
+    boxShadow: '0 10px 24px rgba(0, 0, 0, 0.12)',
+  }
+})
+const plateColorLetter = computed(() => {
+  switch (selectedColor.value.value) {
+    case 'red':
+      return 'מ - '; 
+    case 'black':
+      return 'צ - '; 
+    case 'blue':
+      return 'מצ - '; 
+    default:
+      return '';
+  }
+})
 
 function togglePanels(panel: 'search' | 'map') {
   activePanel.value = panel
@@ -48,6 +72,10 @@ function togglePanels(panel: 'search' | 'map') {
             v-model:plateNumber="plateNumber"
             v-model:selectedColor="selectedColor"
           />
+          <label v-if="plateNumber" class="search-results-label">0 תוצאות נמצאו עבור המספר:</label>
+          <div v-if="plateNumber" class="plate-preview" :style="platePreviewStyle">
+            <span class="plate-preview-text">{{ plateColorLetter }}{{ plateNumber }}</span>
+          </div>
         </div>
         <div v-if="activePanel === 'map'" class="map-panel">
           <Map />
@@ -107,6 +135,54 @@ main {
   width: 100%;
   display: flex;
   justify-content: center;
+}
+
+.search-results-label {
+  display: block;
+  color: white;
+  font-size: 1.1rem;
+  text-align: right;
+  width: 355px;
+  margin-top: 0.5rem;
+}
+
+.plate-preview {
+  margin-top: 1.25rem;
+  width: 100%;
+  height: 70px;
+  border: 4px solid #1a1a1a;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  letter-spacing: 0.35rem;
+  margin-top: 2rem;
+}
+
+.plate-preview::before,
+.plate-preview::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.28);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.plate-preview::before {
+  left: 14px;
+}
+
+.plate-preview::after {
+  right: 14px;
+}
+
+.plate-preview-text {
+  font-size: 2rem;
+  font-weight: 700;
 }
 
 .map-panel {

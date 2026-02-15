@@ -42,7 +42,7 @@ async function searchAddress() {
 
 onMounted(() => {
   map = L.map('map', {
-    center: [31.4853, 34.7818],
+    center: [31.4853, 34.7818], // Israel
     zoom: 7,
   })
 
@@ -92,7 +92,7 @@ defineExpose({ markerPosition })
     <input
       v-model="searchQuery"
       type="text"
-      placeholder="כאן ניתן לחפש מהר כתובת או מקום בארץ"
+      placeholder="כאן ניתן למצוא מהר כתובת או מקום בארץ"
       class="search-input"
       :disabled="isSearching"
     />
