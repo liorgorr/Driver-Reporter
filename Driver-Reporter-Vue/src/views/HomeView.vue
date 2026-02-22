@@ -1,10 +1,35 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import Navbar from '../components/Nav-bar.vue'
 import Map from '../components/Map.vue'
 import PlateNumberInput from '../components/PlateNumberInput.vue'
 
 const activePanel = ref<'none' | 'search' | 'map'>('none')
+const distinctPlateCount = ref<number>(0)
+
+function animateCount(target: number, duration = 2000) {
+  const start = performance.now()
+  const step = (now: number) => {
+    const progress = Math.min((now - start) / duration, 1)
+    const eased = 1 - Math.pow(1 - progress, 3)
+    distinctPlateCount.value = Math.round(eased * target)
+    if (progress < 1) requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
+}
+
+onMounted(async () => {
+  try {
+    const response = await fetch('http://localhost:8000/api/v1/reports/distinct-plate-count/')
+    if (response.ok) {
+      const data = await response.json()
+      animateCount(data.count)
+    }
+  } catch (err) {
+    console.error('Failed to fetch distinct plate count:', err)
+  }
+})
+
 const plateNumber = ref('')
 const selectedColor = ref({ value: 'yellow', text: 'לוחית צהובה (רגילה)' })
 
@@ -42,7 +67,7 @@ function togglePanels(panel: 'search' | 'map') {
     <Navbar />
     <section class="home-view" dir="rtl">
       <h1>
-        0 <br />
+        {{ distinctPlateCount }} <br />
         רכבים כבר דווחו
       </h1>
       <div class="home-actions">

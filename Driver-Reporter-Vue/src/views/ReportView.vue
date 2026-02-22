@@ -34,6 +34,7 @@ const checkedValid = ref(true)
 const dateErrorMsg = ref('')
 
 const showSuccess = ref(false)
+const isLoading = ref(false)
 const hasAttemptedSubmit = ref(false)
 
 function validateDateTime(date: string, time: string) {
@@ -41,7 +42,6 @@ function validateDateTime(date: string, time: string) {
     return false
   }
 
-  // If time is not provided, validate just the date (at end of day)
   let selectedDateTime: Date
   if (time) {
     selectedDateTime = new Date(`${date}T${time}`)
@@ -114,8 +114,12 @@ watch(
   { deep: true },
 )
 
-function handleSend() {
+const submitError = ref('')
+
+async function handleSend() {
   hasAttemptedSubmit.value = true
+  submitError.value = ''
+  isLoading.value = true
 
   offenseTypeValid.value = !!selectedOffenseType.value
   dateValid.value = validateDateTime(reportDate.value, reportTime.value)
@@ -137,10 +141,52 @@ function handleSend() {
     checkedValid.value &&
     markerValid.value
   ) {
-    showSuccess.value = true
-    setTimeout(() => {
-      window.location.href = window.location.pathname + window.location.search
-    }, 2000)
+    try {
+      const payload = {
+        user_name: 'lior', // Placeholder until we implement user accounts
+        plate_number: plateNumber.value,
+        offense_type_name:
+          offenseTypes.value.find((o) => o.value === selectedOffenseType.value)?.text ??
+          selectedOffenseType.value,
+        date: reportDate.value,
+        time: reportTime.value || null,
+        description: description.value,
+        latitude_coordinate: markerPos[0],
+        longitude_coordinate: markerPos[1],
+      }
+
+      const response = await fetch('http://localhost:8000/api/v1/reports/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (response.status === 201) {
+        showSuccess.value = true
+        setTimeout(() => {
+          window.location.href = window.location.pathname + window.location.search
+        }, 2000)
+      } else {
+        const data = await response.json()
+        submitError.value =
+          'אופס! נראה שהשרת שלנו איבד את הדרך עם הדיווח שלך 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר'
+        console.error('Report submission error:', data)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+        setTimeout(() => {
+          submitError.value = ''
+        }, 15000)
+      }
+      isLoading.value = false
+    } catch (err) {
+      submitError.value =
+        'אופס! נראה שהשרת שלנו יצא לשנ"צ 😴\nגם הטובים ביותר צריכים לנוח 😉\nנסו שוב או חזרו מאוחר יותר'
+      console.error('Network error:', err)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      setTimeout(() => {
+        submitError.value = ''
+      }, 15000)
+      isLoading.value = false
+    }
   } else {
     setTimeout(() => {
       const firstInvalid = document.querySelector('.invalid-field, .invalid-msg')
@@ -148,6 +194,7 @@ function handleSend() {
         firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
     }, 50)
+    isLoading.value = false
   }
 }
 </script>
@@ -211,10 +258,15 @@ function handleSend() {
           >אני מצהיר/ה כי כל המידע שהזנתי נכון ומדויק וכי הייתי עד/ה לאירוע במו עיניי</label
         >
       </div>
-      <button class="send-btn" @click="handleSend" :disabled="showSuccess">
+      <button
+        class="send-btn"
+        @click="handleSend"
+        :disabled="isLoading || showSuccess"
+      >
         <span>שליחת דיווח</span>
       </button>
       <div v-if="showSuccess" class="success-message">הדיווח נוסף בהצלחה!</div>
+      <div v-if="submitError" class="error-message">{{ submitError }}</div>
     </section>
   </main>
 </template>
@@ -363,6 +415,26 @@ main {
   border: 1px solid #189359;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   text-align: center;
+}
+
+.error-message {
+  position: fixed;
+  top: 80px;
+  right: 0;
+  left: 0;
+  margin: 0 auto;
+  z-index: 9999;
+  width: fit-content;
+  color: #d63333;
+  font-size: 1.3rem;
+  font-weight: bold;
+  background: #fdecea;
+  border-radius: 6px;
+  padding: 0.7rem 1.2rem;
+  border: 1px solid #d63333;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  text-align: center;
+  white-space: pre-line;
 }
 
 .invalid-field {

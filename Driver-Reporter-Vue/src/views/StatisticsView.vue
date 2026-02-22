@@ -1,5 +1,53 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import Navbar from '../components/Nav-bar.vue'
+
+const distinctPlateCount = ref<number>(0)
+const reportCount = ref<number>(0)
+const maxReportedPlate = ref<string>('0')
+const maxReportedCount = ref<number>(0)
+
+function animateCount(target: number, parameter: { value: any }, duration = 2000) {
+  const start = performance.now()
+  const step = (now: number) => {
+    const progress = Math.min((now - start) / duration, 1)
+    const eased = 1 - Math.pow(1 - progress, 3)
+    parameter.value = Math.round(eased * target)
+    if (progress < 1) requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
+}
+
+onMounted(async () => {
+  try {
+    var response = await fetch('http://localhost:8000/api/v1/reports/distinct-plate-count/')
+    if (response.ok) {
+      const data = await response.json()
+      animateCount(data.count, distinctPlateCount)
+    }
+  } catch (err) {
+    console.error('Failed to fetch distinct plate count:', err)
+  }
+  try {
+    response = await fetch('http://localhost:8000/api/v1/reports/report-count/')
+    if (response.ok) {
+      const data = await response.json()
+      animateCount(data.count, reportCount)
+    }
+  } catch (err) {
+    console.error('Failed to fetch report count:', err)
+  }
+  try {
+    response = await fetch('http://localhost:8000/api/v1/reports/max-reported/')
+    if (response.ok) {
+      const data = await response.json()
+      animateCount(data.maxReported['plate_number'], maxReportedPlate)
+      animateCount(data.maxReported['count'], maxReportedCount)
+    }
+  } catch (err) {
+    console.error('Failed to fetch max reported car:', err)
+  }
+})
 </script>
 
 <template>
@@ -7,10 +55,14 @@ import Navbar from '../components/Nav-bar.vue'
     <Navbar />
     <section class="statistics-view" dir="rtl">
       <h1>כאן משנים מציאות.</h1>
-      <h3 class="stat-1">0 מספרי רכב כבר דווחו</h3>
-      <h3 class="stat-2">שיא הדיווחים על אותו רכב הוא 0</h3>
+      <h3 class="stat-1">{{ distinctPlateCount }} מספרי רכב כבר דווחו</h3>
+      <h3 class="stat-2">
+        הרכב הכי מדווח הוא {{ maxReportedPlate }} <br /><span class="stat-2-sub"
+          >עם {{ maxReportedCount }} דיווחים</span
+        >
+      </h3>
       <h3 class="stat-3">סוג הדיווח הכי נפוץ הוא רמזור אדום עם 0 דיווחים</h3>
-      <h3 class="stat-4">0 דיווחים התקבלו בסך הכל</h3>
+      <h3 class="stat-4">{{ reportCount }} דיווחים התקבלו בסך הכל</h3>
     </section>
   </main>
 </template>
@@ -63,9 +115,14 @@ main {
   font-size: 1.2rem;
 }
 
+.stat-2-sub {
+  display: block;
+  text-align: center;
+}
+
 .stat-3 {
   top: 60%;
-  left: 30%;
+  left: 20%;
   transform: rotate(180deg);
   font-size: 1rem;
   font-family: 'Courier New', Courier, monospace;
