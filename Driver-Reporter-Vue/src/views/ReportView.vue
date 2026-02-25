@@ -3,10 +3,9 @@ import { ref, watch } from 'vue'
 import Navbar from '../components/Nav-bar.vue'
 import PlateNumberInput from '../components/PlateNumberInput.vue'
 import Map from '../components/Map.vue'
-import { onMounted, ref as vueRef } from 'vue'
+import { ref as vueRef } from 'vue'
 
 const plateNumber = ref('')
-const selectedColor = ref({ value: 'yellow', text: 'לוחית צהובה (רגילה)' })
 
 const offenseTypes = ref([
   { value: 'red_light', text: 'רמזור אדום', icon: '🚦' },
@@ -16,13 +15,14 @@ const offenseTypes = ref([
   { value: 'crosswalk', text: 'זכות קדימה במעבר חציה', icon: '🚸' },
   { value: 'sidewalk_parking', text: 'חניה על מדרכה/מעבר חצייה', icon: '❌🅿️🚶' },
   { value: 'bike_lane_parking', text: 'חניה על שביל אופניים', icon: '❌🅿️🚴' },
-  { value: 'other', text: 'אחר (נא לפרט בתיאור)', icon: '💬' },
+  { value: 'other', text: 'אחר', icon: '💬' },
 ])
 
 const selectedOffenseType = ref('')
 const reportDate = ref('')
 const reportTime = ref('')
 const description = ref('')
+const MAX_DESC = 300
 const checked = ref(false)
 
 const mapRef = vueRef()
@@ -145,9 +145,10 @@ async function handleSend() {
       const payload = {
         user_name: 'lior', // Placeholder until we implement user accounts
         plate_number: plateNumber.value,
-        offense_type_name:
-          offenseTypes.value.find((o) => o.value === selectedOffenseType.value)?.text ??
-          selectedOffenseType.value,
+        offense_type_name: (() => {
+          const found = offenseTypes.value.find((o) => o.value === selectedOffenseType.value)
+          return found ? `${found.icon} ${found.text}` : selectedOffenseType.value
+        })(),
         date: reportDate.value,
         time: reportTime.value || null,
         description: description.value,
@@ -155,7 +156,7 @@ async function handleSend() {
         longitude_coordinate: markerPos[1],
       }
 
-      const response = await fetch('http://localhost:8000/api/v1/reports/', {
+      const response = await fetch('http://localhost:8000/api/v1/reports/create/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -204,7 +205,7 @@ async function handleSend() {
     <Navbar />
     <section class="report-view" dir="rtl">
       <h1>מדווחים. משפיעים.</h1>
-      <PlateNumberInput v-model:plateNumber="plateNumber" v-model:selectedColor="selectedColor" />
+      <PlateNumberInput @update:plateNumber="plateNumber = $event" />
       <label class="plate-label">* לא חובה, רק אם אתם בטוחים במספר</label>
       <select
         id="offense-type"
@@ -214,7 +215,8 @@ async function handleSend() {
       >
         <option value="" disabled selected hidden>בחרו את סוג העבירה</option>
         <option v-for="offense in offenseTypes" :key="offense.value" :value="offense.value">
-          {{ offense.icon }} {{ offense.text }}
+          {{ offense.icon }} {{ offense.text
+          }}{{ offense.value === 'other' ? ' (נא לפרט בתיאור)' : '' }}
         </option>
       </select>
       <div class="datetime-row">
@@ -241,9 +243,19 @@ async function handleSend() {
           id="description"
           v-model="description"
           rows="4"
+          :maxlength="MAX_DESC"
           placeholder="הוספת פירוט והערות... "
           :class="{ 'invalid-field': !descriptionValid }"
         ></textarea>
+        <div
+          class="char-counter"
+          :class="{
+            'char-counter--near': description.length >= MAX_DESC * 0.85,
+            'char-counter--full': description.length === MAX_DESC,
+          }"
+        >
+          {{ description.length }} / {{ MAX_DESC }}
+        </div>
       </div>
       <div class="map-panel">
         <label for="report-time">סמנו את מקום האירוע בדיוק איפה שהוא קרה:</label>
@@ -258,11 +270,7 @@ async function handleSend() {
           >אני מצהיר/ה כי כל המידע שהזנתי נכון ומדויק וכי הייתי עד/ה לאירוע במו עיניי</label
         >
       </div>
-      <button
-        class="send-btn"
-        @click="handleSend"
-        :disabled="isLoading || showSuccess"
-      >
+      <button class="send-btn" @click="handleSend" :disabled="isLoading || showSuccess">
         <span>שליחת דיווח</span>
       </button>
       <div v-if="showSuccess" class="success-message">הדיווח נוסף בהצלחה!</div>
@@ -347,6 +355,23 @@ main {
   width: 100%;
   min-height: 70px;
   padding: 0.75rem;
+}
+
+.char-counter {
+  text-align: left;
+  font-size: 0.78rem;
+  color: #666;
+  margin-top: 0.2rem;
+  transition: color 0.2s;
+}
+
+.char-counter--near {
+  color: #e0a800;
+}
+
+.char-counter--full {
+  color: #d63333;
+  font-weight: 600;
 }
 
 .map-panel {

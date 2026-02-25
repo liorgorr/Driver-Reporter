@@ -7,7 +7,7 @@ from .serializers import ReportSerializer
 
 class ReportCreateView(APIView):
     """
-    POST /api/v1/reports/ — create a new report
+    POST /api/v1/reports/create/ — create a new report
     """
     def post(self, request):
         serializer = ReportSerializer(data=request.data)
@@ -27,16 +27,26 @@ class DistinctPlateCountView(APIView):
 
 class ReportCountView(APIView):
     """
-    GET /api/v1/reports/report-count/ — number of reports
+    GET /api/v1/reports/count/ — number of reports
     """
     def get(self, request):
         count = Report.objects.count()
         return Response({'count': count})      
 
-class MaxReportCountView(APIView):
+class MaxReportedPlateView(APIView):
     """
-    GET /api/v1/reports/max-reported/ — the plate number with the most reports (excluding empty plate numbers) and the count of its reports
+    GET /api/v1/reports/max-reported-plate/ — the most reported plate number (excluding empty plate numbers) and the count of its reports
     """
     def get(self, request):
         max_reported = Report.objects.exclude(plate_number='').values('plate_number').annotate(count=Count('plate_number')).order_by('-count').first()
-        return Response({'maxReported': max_reported})      
+        return Response({'maxReported': max_reported})
+
+class ReportsByPlateView(APIView):
+    """
+    GET /api/v1/reports/plates/{plate_number}/ — all reports for a given plate number (excluding empty plate numbers) and the count of those reports
+    """
+    def get(self, request, plate_number):
+        reports = Report.objects.exclude(plate_number='').filter(plate_number=plate_number)
+        serializer = ReportSerializer(reports, many=True)
+        return Response({'count': reports.count(), 'reports': serializer.data})
+       

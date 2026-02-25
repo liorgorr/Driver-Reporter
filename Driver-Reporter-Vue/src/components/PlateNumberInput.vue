@@ -1,14 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 
-const props = defineProps({
-  plateNumber: { type: String, default: '' },
-  selectedColor: {
-    type: Object,
-    default: () => ({ value: 'yellow', text: 'לוחית צהובה (רגילה)' }),
-  },
-})
-
 const emit = defineEmits(['update:plateNumber', 'update:selectedColor'])
 
 const showColorPicker = ref(false)
@@ -22,19 +14,31 @@ const colors = [
   { value: 'blue', text: 'לוחית כחולה (משטרה צבאית)' },
 ]
 
-const localPlate = ref(props.plateNumber)
-const localSelectedColor = ref(props.selectedColor)
+const localPlate = ref('')
+const defaultColor = { value: 'yellow', text: 'לוחית צהובה (רגילה)' }
+const localSelectedColor = ref(defaultColor)
 
-watch(
-  () => props.plateNumber,
-  (v) => (localPlate.value = v),
+function plateWithSuffix(digits: string, colorValue: string): string {
+  if (!digits) return ''
+
+  switch (colorValue) {
+    case 'red':
+      return 'מ - ' + digits
+    case 'black':
+      return 'צ - ' + digits
+    case 'blue':
+      return 'מצ - ' + digits
+    default:
+      return digits
+  }
+}
+
+watch(localPlate, (v) =>
+  emit('update:plateNumber', plateWithSuffix(v, localSelectedColor.value.value)),
 )
-watch(
-  () => props.selectedColor,
-  (v) => (localSelectedColor.value = v),
-)
-watch(localPlate, (v) => emit('update:plateNumber', v))
-watch(localSelectedColor, (v) => emit('update:selectedColor', v))
+watch(localSelectedColor, (v) => {
+  emit('update:selectedColor', v)
+})
 
 function handlePlateNumberInput(event: Event) {
   const input = event.target as HTMLInputElement
@@ -79,6 +83,14 @@ function updateMousePosition(e: MouseEvent) {
 function clearHoverLabel() {
   colorHoverLabel.value = ''
 }
+
+function reset() {
+  localPlate.value = ''
+  localSelectedColor.value = defaultColor
+  showColorPicker.value = false
+}
+
+defineExpose({ reset })
 </script>
 
 <template>

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import Navbar from '../components/Nav-bar.vue'
 import Map from '../components/Map.vue'
 import PlateNumberInput from '../components/PlateNumberInput.vue'
+import ReportBox from '../components/ReportBox.vue'
 
 const activePanel = ref<'none' | 'search' | 'map'>('none')
 const distinctPlateCount = ref<number>(0)
@@ -31,7 +32,42 @@ onMounted(async () => {
 })
 
 const plateNumber = ref('')
-const selectedColor = ref({ value: 'yellow', text: 'לוחית צהובה (רגילה)' })
+const plateInputRef = ref<InstanceType<typeof PlateNumberInput> | null>(null)
+const defaultColor = { value: 'yellow', text: 'לוחית צהובה (רגילה)' }
+const selectedColor = ref(defaultColor)
+const reportCount = ref(0)
+
+interface Report {
+  id: number
+  plate_number: string
+  offense_type_name: string
+  date: string
+  time: string
+  description: string
+  latitude_coordinate: number
+  longitude_coordinate: number
+}
+const reports = ref<Report[]>([])
+
+watch(plateNumber, async (newVal) => {
+  if (!newVal) {
+    reportCount.value = 0
+    reports.value = []
+    return
+  }
+  try {
+    const response = await fetch(
+      `http://localhost:8000/api/v1/reports/plates/${encodeURIComponent(newVal)}/`,
+    )
+    if (response.ok) {
+      const data = await response.json()
+      reportCount.value = data.count
+      reports.value = data.reports
+    }
+  } catch (err) {
+    console.error('Failed to fetch report count:', err)
+  }
+})
 
 const platePreviewStyle = computed(() => {
   const color = selectedColor.value.value
@@ -44,20 +80,15 @@ const platePreviewStyle = computed(() => {
     boxShadow: '0 10px 24px rgba(0, 0, 0, 0.12)',
   }
 })
-const plateColorLetter = computed(() => {
-  switch (selectedColor.value.value) {
-    case 'red':
-      return 'מ - '; 
-    case 'black':
-      return 'צ - '; 
-    case 'blue':
-      return 'מצ - '; 
-    default:
-      return '';
-  }
-})
 
 function togglePanels(panel: 'search' | 'map') {
+  if (panel === 'search') {
+    plateNumber.value = ''
+    reportCount.value = 0
+    reports.value = []
+    selectedColor.value = defaultColor
+    plateInputRef.value?.reset()
+  }
   activePanel.value = panel
 }
 </script>
@@ -92,14 +123,41 @@ function togglePanels(panel: 'search' | 'map') {
       </div>
 
       <div class="home-panel">
-        <div v-if="activePanel === 'search'">
-          <PlateNumberInput
-            v-model:plateNumber="plateNumber"
-            v-model:selectedColor="selectedColor"
-          />
-          <label v-if="plateNumber" class="search-results-label">0 תוצאות נמצאו עבור המספר:</label>
-          <div v-if="plateNumber" class="plate-preview" :style="platePreviewStyle">
-            <span class="plate-preview-text">{{ plateColorLetter }}{{ plateNumber }}</span>
+        <div v-if="activePanel === 'search'" class="search-panel">
+          <div class="search-controls">
+            <PlateNumberInput
+              ref="plateInputRef"
+              @update:plateNumber="plateNumber = $event"
+              @update:selectedColor="selectedColor = $event"
+            />
+            <label v-if="plateNumber && reportCount > 0" class="search-results-label"
+              >{{ reportCount }} דיווחים נמצאו עבור המספר:</label
+            >
+            <label v-if="plateNumber && reportCount === 0" class="no-results-label"
+              >לא נמצאו דיווחים עבור המספר הזה (בינתיים 😉)</label
+            >
+            <div
+              v-if="plateNumber && reportCount > 0"
+              class="plate-preview"
+              :style="platePreviewStyle"
+            >
+              <span class="plate-preview-text">{{ plateNumber }}</span>
+            </div>
+          </div>
+
+          <div v-if="plateNumber && reportCount > 0" class="report-list">
+            <ReportBox
+              v-for="report in reports"
+              :reportId="report.id"
+              :plateNumber="report.plate_number"
+              :offenseType="report.offense_type_name"
+              :date="report.date"
+              :time="report.time"
+              :description="report.description"
+              :latitude="report.latitude_coordinate"
+              :longitude="report.longitude_coordinate"
+              :plateColor="selectedColor.value"
+            />
           </div>
         </div>
         <div v-if="activePanel === 'map'" class="map-panel">
@@ -126,12 +184,14 @@ main {
   color: #d63333;
   gap: 1rem;
   padding: 7rem 2rem 2rem 2rem;
-  max-width: 720px;
+  max-width: 1400px;
+  width: 100%;
 }
 
 .home-view h1 {
   font-size: 5rem;
   margin-bottom: 0.5rem;
+  max-width: 720px;
 }
 
 .home-view h1:first-of-type {
@@ -145,6 +205,7 @@ main {
   align-items: center;
   flex-wrap: wrap;
   margin-top: 1rem;
+  max-width: 720px;
 }
 
 .btn-warning:hover {
@@ -167,7 +228,16 @@ main {
   color: white;
   font-size: 1.1rem;
   text-align: right;
-  width: 355px;
+  font-weight: bold;
+  margin-top: 0.5rem;
+}
+
+.no-results-label {
+  display: block;
+  color: #d63333;
+  font-size: 1.1rem;
+  text-align: right;
+  font-weight: bold;
   margin-top: 0.5rem;
 }
 
@@ -212,5 +282,25 @@ main {
 
 .map-panel {
   width: 450px;
+}
+
+.report-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-top: 2rem;
+  width: 100%;
+  align-items: center;
+}
+
+.search-panel {
+  width: 100%;
+  max-width: 1400px;
+}
+
+.search-controls {
+  max-width: 355px;
+  width: 100%;
+  margin: 0 auto;
 }
 </style>

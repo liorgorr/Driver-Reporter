@@ -4,7 +4,8 @@ import Navbar from '../components/Nav-bar.vue'
 
 const distinctPlateCount = ref<number>(0)
 const reportCount = ref<number>(0)
-const maxReportedPlate = ref<string>('0')
+const maxReportedPlate = ref<number>(0)
+const maxReportedPrefix = ref<string>('')
 const maxReportedCount = ref<number>(0)
 
 function animateCount(target: number, parameter: { value: any }, duration = 2000) {
@@ -29,7 +30,7 @@ onMounted(async () => {
     console.error('Failed to fetch distinct plate count:', err)
   }
   try {
-    response = await fetch('http://localhost:8000/api/v1/reports/report-count/')
+    response = await fetch('http://localhost:8000/api/v1/reports/count/')
     if (response.ok) {
       const data = await response.json()
       animateCount(data.count, reportCount)
@@ -38,14 +39,18 @@ onMounted(async () => {
     console.error('Failed to fetch report count:', err)
   }
   try {
-    response = await fetch('http://localhost:8000/api/v1/reports/max-reported/')
+    response = await fetch('http://localhost:8000/api/v1/reports/max-reported-plate/')
     if (response.ok) {
       const data = await response.json()
-      animateCount(data.maxReported['plate_number'], maxReportedPlate)
+      const raw: string = data.maxReported['plate_number']
+      const parts = raw.split(' - ')
+      const digits = parts.length > 1 ? parts[1] : parts[0]
+      maxReportedPrefix.value = parts.length > 1 ? parts[0] + ' - ' : ''
+      animateCount(Number(digits), maxReportedPlate)
       animateCount(data.maxReported['count'], maxReportedCount)
     }
   } catch (err) {
-    console.error('Failed to fetch max reported car:', err)
+    console.error('Failed to fetch max reported plate:', err)
   }
 })
 </script>
@@ -57,7 +62,7 @@ onMounted(async () => {
       <h1>כאן משנים מציאות.</h1>
       <h3 class="stat-1">{{ distinctPlateCount }} מספרי רכב כבר דווחו</h3>
       <h3 class="stat-2">
-        הרכב הכי מדווח הוא {{ maxReportedPlate }} <br /><span class="stat-2-sub"
+        הרכב הכי מדווח הוא {{ maxReportedPrefix }}{{ maxReportedPlate }} <br /><span class="stat-2-sub"
           >עם {{ maxReportedCount }} דיווחים</span
         >
       </h3>
