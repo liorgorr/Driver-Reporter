@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import MaxReportedPlateView, ReportCreateView, DistinctPlateCountView, ReportCountView, ReportsByPlateView
+from .views import MaxReportedPlateView, ReportCreateView, DistinctPlateCountView, ReportCountView, ReportsByPlateView, MaxReportedTypeView, AllReportsView
 
 urlpatterns = [
     path('reports/create/', ReportCreateView.as_view(), name='report-create'),
@@ -7,4 +7,6 @@ urlpatterns = [
     path('reports/count/', ReportCountView.as_view(), name='count'),
     path('reports/max-reported-plate/', MaxReportedPlateView.as_view(), name='max-reported-plate'),
     path('reports/plates/<str:plate_number>/', ReportsByPlateView.as_view(), name='reports-by-plate'),
+    path('reports/max-reported-type/', MaxReportedTypeView.as_view(), name='max-reported-type'),
+    path('reports/all/', AllReportsView.as_view(), name='all-reports'),
 ]

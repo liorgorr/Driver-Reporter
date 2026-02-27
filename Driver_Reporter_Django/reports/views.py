@@ -49,4 +49,22 @@ class ReportsByPlateView(APIView):
         reports = Report.objects.exclude(plate_number='').filter(plate_number=plate_number)
         serializer = ReportSerializer(reports, many=True)
         return Response({'count': reports.count(), 'reports': serializer.data})
+
+class MaxReportedTypeView(APIView):
+    """
+    GET /api/v1/reports/max-reported-type/ — the most reported offense type (excluding other) and the count of its reports
+    """
+    def get(self, request):
+        max_reported = Report.objects.exclude(offense_type_name='💬 אחר').values('offense_type_name').annotate(count=Count('offense_type_name')).order_by('-count').first()
+        return Response({'maxReported': max_reported})
+
+
+class AllReportsView(APIView):
+    """
+    GET /api/v1/reports/all/ — all reports with coordinates
+    """
+    def get(self, request):
+        reports = Report.objects.exclude(latitude_coordinate__isnull=True).exclude(longitude_coordinate__isnull=True)
+        serializer = ReportSerializer(reports, many=True)
+        return Response({'reports': serializer.data})
        

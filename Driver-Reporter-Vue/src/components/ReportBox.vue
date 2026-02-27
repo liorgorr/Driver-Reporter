@@ -25,9 +25,16 @@ const plateBadgeStyle = computed(() => {
   }
 })
 
+const offenseLabelColor = computed(() => {
+  const t = props.offenseType ?? ''
+  if (t.includes('חניה')) return '#1976d2'
+  if (t.includes('אחר')) return '#888888'
+  return '#d63333'
+})
+
 function copyCoords() {
   if (props.latitude == null || props.longitude == null) return
-  navigator.clipboard.writeText(`${props.latitude.toFixed(5)}, ${props.longitude.toFixed(5)}`)
+  navigator.clipboard.writeText(`${props.latitude.toFixed(6)}, ${props.longitude.toFixed(6)}`)
 }
 </script>
 
@@ -35,7 +42,9 @@ function copyCoords() {
   <div class="report-box" dir="rtl">
     <div class="report-box__header">
       <span class="plate-badge" :style="plateBadgeStyle">{{ plateNumber || '—' }}</span>
-      <span class="offense-label">{{ offenseType || '—' }}</span>
+      <span class="offense-label" :style="{ color: offenseLabelColor }">{{
+        offenseType || '—'
+      }}</span>
       <span v-if="reportId != null" class="report-id">#{{ reportId }}</span>
     </div>
 
@@ -63,7 +72,7 @@ function copyCoords() {
         <span class="field__label">קואורדינטות לחיפוש במפה</span>
         <span class="field__value coords-value">
           <template v-if="latitude != null && longitude != null">
-            {{ latitude.toFixed(5) }}, {{ longitude.toFixed(5) }}
+            {{ latitude.toFixed(6) }}, {{ longitude.toFixed(6) }}
             <button class="copy-btn" @click="copyCoords" :title="'העתקה'">
               {{ '📋' }}
             </button>
@@ -81,6 +90,7 @@ function copyCoords() {
   border: 1px solid #2a2a2a;
   border-radius: 12px;
   overflow: hidden;
+  min-width: 330px;
   width: 100%;
   height: 555px;
   font-family: 'Assistant', sans-serif;
@@ -111,7 +121,6 @@ function copyCoords() {
 
 .offense-label {
   font-size: 0.95rem;
-  color: #d63333;
   font-weight: 600;
   flex: 1;
 }
@@ -173,7 +182,7 @@ function copyCoords() {
 }
 
 .field__value--desc {
-  white-space: pre-wrap;
+  white-space: normal;
   word-break: break-word;
   font-weight: 400;
   color: #bbb;

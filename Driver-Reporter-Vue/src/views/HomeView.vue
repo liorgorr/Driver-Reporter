@@ -2,6 +2,7 @@
 import { computed, ref, onMounted, watch } from 'vue'
 import Navbar from '../components/Nav-bar.vue'
 import Map from '../components/Map.vue'
+import type { MapMarker } from '../components/Map.vue'
 import PlateNumberInput from '../components/PlateNumberInput.vue'
 import ReportBox from '../components/ReportBox.vue'
 
@@ -81,6 +82,30 @@ const platePreviewStyle = computed(() => {
   }
 })
 
+const allReports = ref<MapMarker[]>([])
+
+async function fetchAllReports() {
+  if (allReports.value.length > 0) return
+  try {
+    const response = await fetch('http://localhost:8000/api/v1/reports/all/')
+    if (response.ok) {
+      const data = await response.json()
+      allReports.value = data.reports.map((r: Report) => ({
+        id: r.id,
+        lat: r.latitude_coordinate,
+        lng: r.longitude_coordinate,
+        plateNumber: r.plate_number,
+        offenseType: r.offense_type_name,
+        description: r.description,
+        date: r.date,
+        time: r.time,
+      }))
+    }
+  } catch (err) {
+    console.error('Failed to fetch all reports:', err)
+  }
+}
+
 function togglePanels(panel: 'search' | 'map') {
   if (panel === 'search') {
     plateNumber.value = ''
@@ -91,6 +116,10 @@ function togglePanels(panel: 'search' | 'map') {
   }
   activePanel.value = panel
 }
+
+onMounted(() => {
+  fetchAllReports()
+})
 </script>
 
 <template>
@@ -161,7 +190,7 @@ function togglePanels(panel: 'search' | 'map') {
           </div>
         </div>
         <div v-if="activePanel === 'map'" class="map-panel">
-          <Map />
+          <Map :markers="allReports" />
         </div>
       </div>
     </section>
@@ -286,11 +315,12 @@ main {
 
 .report-list {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.5rem;
   margin-top: 2rem;
   width: 100%;
-  align-items: center;
+  align-items: start;
+  justify-items: stretch;
 }
 
 .search-panel {

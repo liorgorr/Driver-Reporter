@@ -6,7 +6,9 @@ const distinctPlateCount = ref<number>(0)
 const reportCount = ref<number>(0)
 const maxReportedPlate = ref<number>(0)
 const maxReportedPrefix = ref<string>('')
-const maxReportedCount = ref<number>(0)
+const maxReportedPlateCount = ref<number>(0)
+const maxReportedType = ref<string>('')
+const maxReportedTypeCount = ref<number>(0)
 
 function animateCount(target: number, parameter: { value: any }, duration = 2000) {
   const start = performance.now()
@@ -47,10 +49,20 @@ onMounted(async () => {
       const digits = parts.length > 1 ? parts[1] : parts[0]
       maxReportedPrefix.value = parts.length > 1 ? parts[0] + ' - ' : ''
       animateCount(Number(digits), maxReportedPlate)
-      animateCount(data.maxReported['count'], maxReportedCount)
+      animateCount(data.maxReported['count'], maxReportedPlateCount)
     }
   } catch (err) {
     console.error('Failed to fetch max reported plate:', err)
+  }
+  try {
+    response = await fetch('http://localhost:8000/api/v1/reports/max-reported-type/')
+    if (response.ok) {
+      const data = await response.json()
+      maxReportedType.value = data.maxReported['offense_type_name']
+      animateCount(data.maxReported['count'], maxReportedTypeCount)
+    }
+  } catch (err) {
+    console.error('Failed to fetch max reported type:', err)
   }
 })
 </script>
@@ -62,11 +74,14 @@ onMounted(async () => {
       <h1>כאן משנים מציאות.</h1>
       <h3 class="stat-1">{{ distinctPlateCount }} מספרי רכב כבר דווחו</h3>
       <h3 class="stat-2">
-        הרכב הכי מדווח הוא {{ maxReportedPrefix }}{{ maxReportedPlate }} <br /><span class="stat-2-sub"
-          >עם {{ maxReportedCount }} דיווחים</span
+        הרכב הכי מדווח הוא {{ maxReportedPrefix }}{{ maxReportedPlate }} <br /><span
+          class="stat-2-sub"
+          >עם {{ maxReportedPlateCount }} דיווחים</span
         >
       </h3>
-      <h3 class="stat-3">סוג הדיווח הכי נפוץ הוא רמזור אדום עם 0 דיווחים</h3>
+      <h3 class="stat-3">
+        סוג הדיווח הכי נפוץ הוא {{ maxReportedType }} עם {{ maxReportedTypeCount }} דיווחים
+      </h3>
       <h3 class="stat-4">{{ reportCount }} דיווחים התקבלו בסך הכל</h3>
     </section>
   </main>
@@ -115,7 +130,7 @@ main {
 
 .stat-2 {
   top: 55%;
-  left: 100%;
+  left: 110%;
   transform: rotate(35deg);
   font-size: 1.2rem;
 }
