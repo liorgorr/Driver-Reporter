@@ -50,24 +50,38 @@ interface Report {
 }
 const reports = ref<Report[]>([])
 
-watch(plateNumber, async (newVal) => {
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+let searchAbortController: AbortController | null = null
+
+watch(plateNumber, (newVal) => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  if (searchAbortController) searchAbortController.abort()
+
   if (!newVal) {
     reportCount.value = 0
     reports.value = []
     return
   }
-  try {
-    const response = await fetch(
-      `http://localhost:8000/api/v1/reports/plates/${encodeURIComponent(newVal)}/`,
-    )
-    if (response.ok) {
-      const data = await response.json()
-      reportCount.value = data.count
-      reports.value = data.reports
+
+  searchDebounceTimer = setTimeout(async () => {
+    searchAbortController = new AbortController()
+    const { signal } = searchAbortController
+
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/v1/reports/plates/${encodeURIComponent(newVal)}/`,
+        { signal },
+      )
+      if (response.ok) {
+        const data = await response.json()
+        reportCount.value = data.count
+        reports.value = data.reports
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      console.error('Failed to fetch reports:', err)
     }
-  } catch (err) {
-    console.error('Failed to fetch report count:', err)
-  }
+  }, 10)
 })
 
 const platePreviewStyle = computed(() => {
@@ -83,6 +97,17 @@ const platePreviewStyle = computed(() => {
 })
 
 const allReports = ref<MapMarker[]>([])
+const dateFrom = ref('')
+const dateTo = ref('')
+
+const filteredReports = computed(() => {
+  if (!dateFrom.value && !dateTo.value) return allReports.value
+  return allReports.value.filter((r) => {
+    if (dateFrom.value && r.date < dateFrom.value) return false
+    if (dateTo.value && r.date > dateTo.value) return false
+    return true
+  })
+})
 
 async function fetchAllReports() {
   if (allReports.value.length > 0) return
@@ -190,7 +215,27 @@ onMounted(() => {
           </div>
         </div>
         <div v-if="activePanel === 'map'" class="map-panel">
-          <Map :markers="allReports" />
+          <div class="date-filter" dir="rtl">
+            <div class="date-filter-row">
+              <label>מתאריך:</label>
+              <input type="date" v-model="dateFrom" class="date-input" />
+              <label>עד תאריך:</label>
+              <input type="date" v-model="dateTo" class="date-input" />
+            </div>
+            <div class="date-filter-row">
+              <button
+                v-if="dateFrom || dateTo"
+                class="clear-dates-btn"
+                @click="((dateFrom = ''), (dateTo = ''))"
+              >
+                ניקוי הסינון
+              </button>
+              <span class="filter-count" v-if="dateFrom || dateTo">
+                מציג {{ filteredReports.length }} מתוך {{ allReports.length }} דיווחים
+              </span>
+            </div>
+          </div>
+          <Map :markers="filteredReports" />
         </div>
       </div>
     </section>
@@ -311,6 +356,65 @@ main {
 
 .map-panel {
   width: 450px;
+}
+
+.date-filter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.date-filter-row {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  justify-content: right;
+  width: 100%;
+  text-align: right;
+}
+
+.date-filter label {
+  font-size: 0.95rem;
+  color: #ccc;
+  white-space: nowrap;
+}
+
+.date-input {
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid #555;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.date-input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+.clear-dates-btn {
+  padding: 0.35rem 0.9rem;
+  border-radius: 6px;
+  border: none;
+  background: #d63333;
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.clear-dates-btn:hover {
+  background: #b02020;
+}
+
+.filter-count {
+  font-size: 0.85rem;
+  color: #aaa;
 }
 
 .report-list {

@@ -206,7 +206,7 @@ async function handleSend() {
     <section class="report-view" dir="rtl">
       <h1>מדווחים. משפיעים.</h1>
       <PlateNumberInput @update:plateNumber="plateNumber = $event" />
-      <label class="plate-label">* לא חובה, רק אם אתם בטוחים במספר</label>
+      <label class="plate-label">* לא חובה, רק אם בטוחים במספר</label>
       <select
         id="offense-type"
         v-model="selectedOffenseType"

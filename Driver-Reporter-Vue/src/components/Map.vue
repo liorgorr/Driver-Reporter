@@ -160,6 +160,16 @@ onMounted(() => {
   }
 })
 
+watch(
+  () => props.markers,
+  (newMarkers) => {
+    displayMarkers.forEach((m) => m.remove())
+    if (newMarkers) {
+      renderMarkers(newMarkers)
+    }
+  },
+)
+
 defineExpose({ markerPosition })
 </script>
 
