@@ -1,7 +1,8 @@
 from django.urls import path
-from .views import MaxReportedPlateView, ReportCreateView, DistinctPlateCountView, ReportCountView, ReportsByPlateView, MaxReportedTypeView, AllReportsView
+from .views import MaxReportedPlateView, ReportCreateView, DistinctPlateCountView, ReportCountView, ReportsByPlateView, MaxReportedTypeView, AllReportsView, CheckUsernameView
 
 urlpatterns = [
+    path('auth/check-username/', CheckUsernameView.as_view(), name='check-username'),
     path('reports/create/', ReportCreateView.as_view(), name='report-create'),
     path('reports/distinct-plate-count/', DistinctPlateCountView.as_view(), name='distinct-plate-count'),
     path('reports/count/', ReportCountView.as_view(), name='count'),

@@ -22,9 +22,9 @@ function animateCount(target: number, duration = 2000) {
 
 onMounted(async () => {
   try {
-    const response = await fetch('http://localhost:8000/api/v1/reports/distinct-plate-count/')
-    if (response.ok) {
-      const data = await response.json()
+    const res = await fetch('http://localhost:8000/api/v1/reports/distinct-plate-count/')
+    if (res.ok) {
+      const data = await res.json()
       animateCount(data.count)
     }
   } catch (err) {
@@ -41,7 +41,7 @@ const reportCount = ref(0)
 interface Report {
   id: number
   plate_number: string
-  offense_type_name: string
+  offense_type: string
   date: string
   time: string
   description: string
@@ -68,12 +68,12 @@ watch(plateNumber, (newVal) => {
     const { signal } = searchAbortController
 
     try {
-      const response = await fetch(
+      const res = await fetch(
         `http://localhost:8000/api/v1/reports/plates/${encodeURIComponent(newVal)}/`,
         { signal },
       )
-      if (response.ok) {
-        const data = await response.json()
+      if (res.ok) {
+        const data = await res.json()
         reportCount.value = data.count
         reports.value = data.reports
       }
@@ -112,15 +112,15 @@ const filteredReports = computed(() => {
 async function fetchAllReports() {
   if (allReports.value.length > 0) return
   try {
-    const response = await fetch('http://localhost:8000/api/v1/reports/all/')
-    if (response.ok) {
-      const data = await response.json()
+    const res = await fetch('http://localhost:8000/api/v1/reports/all/')
+    if (res.ok) {
+      const data = await res.json()
       allReports.value = data.reports.map((r: Report) => ({
         id: r.id,
         lat: r.latitude_coordinate,
         lng: r.longitude_coordinate,
         plateNumber: r.plate_number,
-        offenseType: r.offense_type_name,
+        offenseType: r.offense_type,
         description: r.description,
         date: r.date,
         time: r.time,
@@ -204,7 +204,7 @@ onMounted(() => {
               v-for="report in reports"
               :reportId="report.id"
               :plateNumber="report.plate_number"
-              :offenseType="report.offense_type_name"
+              :offenseType="report.offense_type"
               :date="report.date"
               :time="report.time"
               :description="report.description"

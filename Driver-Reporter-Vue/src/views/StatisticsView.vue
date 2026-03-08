@@ -23,27 +23,27 @@ function animateCount(target: number, parameter: { value: any }, duration = 2000
 
 onMounted(async () => {
   try {
-    var response = await fetch('http://localhost:8000/api/v1/reports/distinct-plate-count/')
-    if (response.ok) {
-      const data = await response.json()
+    var res = await fetch('http://localhost:8000/api/v1/reports/distinct-plate-count/')
+    if (res.ok) {
+      const data = await res.json()
       animateCount(data.count, distinctPlateCount)
     }
   } catch (err) {
     console.error('Failed to fetch distinct plate count:', err)
   }
   try {
-    response = await fetch('http://localhost:8000/api/v1/reports/count/')
-    if (response.ok) {
-      const data = await response.json()
+    var res = await fetch('http://localhost:8000/api/v1/reports/count/')
+    if (res.ok) {
+      const data = await res.json()
       animateCount(data.count, reportCount)
     }
   } catch (err) {
     console.error('Failed to fetch report count:', err)
   }
   try {
-    response = await fetch('http://localhost:8000/api/v1/reports/max-reported-plate/')
-    if (response.ok) {
-      const data = await response.json()
+    res = await fetch('http://localhost:8000/api/v1/reports/max-reported-plate/')
+    if (res.ok) {
+      const data = await res.json()
       const raw: string = data.maxReported['plate_number']
       const parts = raw.split(' - ')
       const digits = parts.length > 1 ? parts[1] : parts[0]
@@ -55,10 +55,10 @@ onMounted(async () => {
     console.error('Failed to fetch max reported plate:', err)
   }
   try {
-    response = await fetch('http://localhost:8000/api/v1/reports/max-reported-type/')
-    if (response.ok) {
-      const data = await response.json()
-      maxReportedType.value = data.maxReported['offense_type_name']
+    res = await fetch('http://localhost:8000/api/v1/reports/max-reported-type/')
+    if (res.ok) {
+      const data = await res.json()
+      maxReportedType.value = data.maxReported['offense_type']
       animateCount(data.maxReported['count'], maxReportedTypeCount)
     }
   } catch (err) {

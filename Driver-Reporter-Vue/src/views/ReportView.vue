@@ -34,7 +34,7 @@ const checkedValid = ref(true)
 const dateErrorMsg = ref('')
 
 const showSuccess = ref(false)
-const isLoading = ref(false)
+const isSubmitting = ref(false)
 const hasAttemptedSubmit = ref(false)
 
 function validateDateTime(date: string, time: string) {
@@ -114,12 +114,12 @@ watch(
   { deep: true },
 )
 
-const submitError = ref('')
+const serverError = ref('')
 
 async function handleSend() {
   hasAttemptedSubmit.value = true
-  submitError.value = ''
-  isLoading.value = true
+  serverError.value = ''
+  isSubmitting.value = true
 
   offenseTypeValid.value = !!selectedOffenseType.value
   dateValid.value = validateDateTime(reportDate.value, reportTime.value)
@@ -135,67 +135,68 @@ async function handleSend() {
     markerPos && Array.isArray(markerPos) && markerPos.length === 2 && markerPos[0] && markerPos[1]
 
   if (
-    offenseTypeValid.value &&
-    dateValid.value &&
-    descriptionValid.value &&
-    checkedValid.value &&
-    markerValid.value
+    !offenseTypeValid.value ||
+    !dateValid.value ||
+    !descriptionValid.value ||
+    !checkedValid.value ||
+    !markerValid.value
   ) {
-    try {
-      const payload = {
-        user_name: 'lior', // Placeholder until we implement user accounts
-        plate_number: plateNumber.value,
-        offense_type_name: (() => {
-          const found = offenseTypes.value.find((o) => o.value === selectedOffenseType.value)
-          return found ? `${found.icon} ${found.text}` : selectedOffenseType.value
-        })(),
-        date: reportDate.value,
-        time: reportTime.value || null,
-        description: description.value,
-        latitude_coordinate: markerPos[0],
-        longitude_coordinate: markerPos[1],
-      }
-
-      const response = await fetch('http://localhost:8000/api/v1/reports/create/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      if (response.status === 201) {
-        showSuccess.value = true
-        setTimeout(() => {
-          window.location.href = window.location.pathname + window.location.search
-        }, 2000)
-      } else {
-        const data = await response.json()
-        submitError.value =
-          'אופס! נראה שהשרת שלנו איבד את הדרך עם הדיווח שלך 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר'
-        console.error('Report submission error:', data)
-        window.scrollTo({ top: 0, behavior: 'smooth' })
-        setTimeout(() => {
-          submitError.value = ''
-        }, 15000)
-      }
-      isLoading.value = false
-    } catch (err) {
-      submitError.value =
-        'אופס! נראה שהשרת שלנו יצא לשנ"צ 😴\nגם הטובים ביותר צריכים לנוח 😉\nנסו שוב או חזרו מאוחר יותר'
-      console.error('Network error:', err)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-      setTimeout(() => {
-        submitError.value = ''
-      }, 15000)
-      isLoading.value = false
-    }
-  } else {
     setTimeout(() => {
       const firstInvalid = document.querySelector('.invalid-field, .invalid-msg')
       if (firstInvalid) {
         firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
     }, 50)
-    isLoading.value = false
+    isSubmitting.value = false
+    return
+  }
+
+  try {
+    const payload = {
+      user_name: 'lior', // Placeholder until we implement user accounts
+      plate_number: plateNumber.value,
+      offense_type: (() => {
+        const found = offenseTypes.value.find((o) => o.value === selectedOffenseType.value)
+        return found ? `${found.icon} ${found.text}` : selectedOffenseType.value
+      })(),
+      date: reportDate.value,
+      time: reportTime.value || null,
+      description: description.value,
+      latitude_coordinate: markerPos[0],
+      longitude_coordinate: markerPos[1],
+    }
+
+    const res = await fetch('http://localhost:8000/api/v1/reports/create/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    if (res.status === 201) {
+      showSuccess.value = true
+      setTimeout(() => {
+        window.location.href = window.location.pathname + window.location.search
+      }, 2000)
+    } else {
+      const data = await res.json()
+      serverError.value =
+        'אופס! נראה שהשרת שלנו איבד את הדרך עם הדיווח שלך 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר'
+      console.error('Report submission error:', data)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      setTimeout(() => {
+        serverError.value = ''
+      }, 15000)
+    }
+  } catch (err) {
+    serverError.value =
+      'אופס! נראה שהשרת שלנו יצא לשנ"צ 😴\nגם הטובים ביותר צריכים לנוח 😉\nנסו שוב או חזרו מאוחר יותר'
+    console.error('Network error:', err)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setTimeout(() => {
+      serverError.value = ''
+    }, 15000)
+  } finally {
+    isSubmitting.value = false
   }
 }
 </script>
@@ -258,8 +259,8 @@ async function handleSend() {
         </div>
       </div>
       <div class="map-panel">
-        <label for="report-time">סמנו את מקום האירוע בדיוק איפה שהוא קרה:</label>
-        <Map :allowMarker="true" ref="mapRef" />
+        <label for="map">סמנו את מקום האירוע בדיוק איפה שהוא קרה:</label>
+        <Map :allowMarker="true" id="map" ref="mapRef" />
         <div v-if="!markerValid" class="invalid-msg">יש לסמן את מקום האירוע במפה</div>
       </div>
       <div class="checkbox-row">
@@ -270,11 +271,11 @@ async function handleSend() {
           >אני מצהיר/ה כי כל המידע שהזנתי נכון ומדויק וכי הייתי עד/ה לאירוע במו עיניי</label
         >
       </div>
-      <button class="send-btn" @click="handleSend" :disabled="isLoading || showSuccess">
+      <button class="send-btn" @click="handleSend" :disabled="isSubmitting || showSuccess">
         <span>שליחת דיווח</span>
       </button>
       <div v-if="showSuccess" class="success-message">הדיווח נוסף בהצלחה!</div>
-      <div v-if="submitError" class="error-message">{{ submitError }}</div>
+      <div v-if="serverError" class="error-message">{{ serverError }}</div>
     </section>
   </main>
 </template>

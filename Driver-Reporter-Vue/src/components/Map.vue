@@ -136,7 +136,7 @@ onMounted(() => {
   })
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 25,
+    maxZoom: 19,
     minZoom: 7,
     attribution: '&copy; OpenStreetMap contributors',
   }).addTo(map)

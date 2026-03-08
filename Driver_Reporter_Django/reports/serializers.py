@@ -9,7 +9,7 @@ class ReportSerializer(serializers.ModelSerializer):
             'id',
             'user_name',
             'plate_number',
-            'offense_type_name',
+            'offense_type',
             'date',
             'time',
             'description',

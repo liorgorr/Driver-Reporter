@@ -2,8 +2,19 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db.models import Count
+from django.contrib.auth.models import User
 from .models import Report
 from .serializers import ReportSerializer
+
+class CheckUsernameView(APIView):
+    """
+    GET /api/v1/auth/check-username/?username=<username> — check if a username is available
+    """
+    def get(self, request):
+        username = request.query_params.get('username', '')
+        exists = User.objects.filter(username=username).exists()
+        return Response({'available': not exists})
+
 
 class ReportCreateView(APIView):
     """
@@ -55,7 +66,7 @@ class MaxReportedTypeView(APIView):
     GET /api/v1/reports/max-reported-type/ — the most reported offense type (excluding other) and the count of its reports
     """
     def get(self, request):
-        max_reported = Report.objects.exclude(offense_type_name='💬 אחר').values('offense_type_name').annotate(count=Count('offense_type_name')).order_by('-count').first()
+        max_reported = Report.objects.exclude(offense_type='💬 אחר').values('offense_type').annotate(count=Count('offense_type')).order_by('-count').first()
         return Response({'maxReported': max_reported})
 
 
