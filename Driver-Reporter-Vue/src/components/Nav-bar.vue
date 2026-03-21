@@ -1,26 +1,61 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { useRouter } from 'vue-router'
+import { useAuth } from '../stores/auth'
+
+const { isLoggedIn, syncAuthStatus } = useAuth()
+const router = useRouter()
+
+async function handleSignout() {
+  try {
+    await fetch('http://localhost:8000/api/v1/auth/logout/', {
+      method: 'POST',
+      credentials: 'include',
+    })
+    await syncAuthStatus()
+  } catch (err) {
+    console.error('Signout request failed:', err)
+  } finally {
+    await router.push('/')
+  }
+}
+</script>
 
 <template>
   <nav class="navbar fixed-top navbar-expand-lg navbar-custom" data-bs-theme="dark" dir="rtl">
     <div class="container-fluid justify-content-start">
       <router-link to="/" class="navbar-brand" active-class="fw-bold">
-        <img src="../assets/icons/favicon.png" width="30" height="30" alt="driver" />
+        <img src="../assets/icons/favicon.png" width="30" height="30" />
         מלשינהג
       </router-link>
       <router-link to="/about" class="navbar-brand" active-class="fw-bold">
-        <img src="../assets/icons/about.png" width="30" height="30" alt="about" />
+        <img src="../assets/icons/about.png" width="30" height="30" />
         אודות
       </router-link>
       <router-link to="/statistics" class="navbar-brand" active-class="fw-bold">
-        <img src="../assets/icons/statistics.png" width="25" height="25" alt="statistics" />
+        <img src="../assets/icons/statistics.png" width="25" height="25" />
         נתונים
       </router-link>
       <router-link to="/report" class="navbar-brand report-box" active-class="fw-bold">
-        <img src="../assets/icons/plus.png" width="20" height="20" alt="statistics" />
+        <img src="../assets/icons/plus.png" width="20" height="20" />
         דיווח חדש
       </router-link>
-      <router-link to="/signin" class="navbar-brand signin-box" active-class="fw-bold"> כניסה </router-link>
-      <router-link to="/signup" class="navbar-brand signup-box" active-class="fw-bold">
+      <router-link v-if="isLoggedIn" to="/profile" class="navbar-brand" active-class="fw-bold">
+        <img src="../assets/icons/profile.png" width="30" height="30" />
+        פרופיל
+      </router-link>
+      <button v-if="isLoggedIn" class="navbar-brand" @click="handleSignout">
+        <img src="../assets/icons/signout.png" width="23" height="23" />
+        התנתקות
+      </button>
+      <router-link v-if="!isLoggedIn" to="/signin" class="navbar-brand" active-class="fw-bold">
+        כניסה
+      </router-link>
+      <router-link
+        v-if="!isLoggedIn"
+        to="/signup"
+        class="navbar-brand signup-box"
+        active-class="fw-bold"
+      >
         הרשמה
       </router-link>
     </div>
@@ -42,6 +77,7 @@
 }
 
 .navbar-brand {
+  font-size: 20px;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -79,5 +115,10 @@
   border-radius: 6px;
   padding: 0.3rem 0.6rem;
   margin-inline: 0.25rem;
+}
+
+button.navbar-brand {
+  background: none;
+  border: none;
 }
 </style>

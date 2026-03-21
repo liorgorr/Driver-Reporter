@@ -1,24 +1,144 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import Navbar from '../components/Nav-bar.vue'
+import { useAuth } from '../stores/auth'
+
+const router = useRouter()
+
+const username = ref('')
+const password = ref('')
+
+const usernameValid = ref(true)
+const passwordValid = ref(true)
+
+const usernameError = ref('')
+const passwordError = ref('')
+const wrongInputError = ref('')
+const serverError = ref('')
 
 const showPassword = ref(false)
+
+const isSubmitting = ref(false)
+const hasAttemptedSubmit = ref(false)
+
+const { isLoggedIn, syncAuthStatus } = useAuth()
+
+function validateUsername(val: string) {
+  if (!val) {
+    usernameError.value = 'אופס! נראה ששכחת להזין את שם המשתמש שלך 😕'
+    return false
+  }
+  return true
+}
+
+function validatePassword(val: string) {
+  if (!val) {
+    passwordError.value = 'אופס! נראה ששכחת להזין את הסיסמא שלך 😕'
+    return false
+  }
+  return true
+}
+
+watch(username, async (val) => {
+  if (hasAttemptedSubmit.value) usernameValid.value = validateUsername(val)
+  wrongInputError.value = ''
+})
+
+watch(password, (val) => {
+  if (hasAttemptedSubmit.value) passwordValid.value = validatePassword(val)
+  wrongInputError.value = ''
+})
+
+async function handleSignin() {
+  hasAttemptedSubmit.value = true
+  isSubmitting.value = true
+
+  usernameValid.value = validateUsername(username.value)
+  passwordValid.value = validatePassword(password.value)
+
+  if (!usernameValid.value || !passwordValid.value) {
+    setTimeout(() => {
+      const firstInvalid = document.querySelector('.invalid-field, .invalid-msg')
+      if (firstInvalid) firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 50)
+    isSubmitting.value = false
+    return
+  }
+
+  wrongInputError.value = ''
+  serverError.value = ''
+
+  try {
+    const res = await fetch('http://localhost:8000/api/v1/auth/login/', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: username.value.trim(),
+        password: password.value,
+      }),
+    })
+
+    if (res.ok) {
+      await syncAuthStatus()
+      await router.push('/')
+    } else {
+      if (res.status === 401) {
+        wrongInputError.value = 'אופס! נראה ששם המשתמש ו/או הסיסמא שגויים 😕'
+      } else {
+        const data = await res.json()
+        serverError.value =
+          'אופס! נראה שהשרת שלנו איבד את הדרך עם הדיווח שלך 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר'
+        console.error('Report submission error:', data)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+        setTimeout(() => {
+          serverError.value = ''
+        }, 15000)
+      }
+    }
+  } catch (err) {
+    serverError.value =
+      'אופס! נראה שהשרת שלנו יצא לשנ"צ 😴\nגם הטובים ביותר צריכים לנוח 😉\nנסו שוב או חזרו מאוחר יותר'
+    console.error('Network error:', err)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setTimeout(() => {
+      serverError.value = ''
+    }, 15000)
+  } finally {
+    isSubmitting.value = false
+  }
+}
 </script>
 
 <template>
   <main>
     <Navbar />
-    <section class="signin-view" dir="rtl">
+    <section v-if="!isLoggedIn" class="signin-view" dir="rtl">
       <h1>כאן מתחברים לחשבון קיים.</h1>
       <div class="signin-content">
-        <label for="signin-input" class="signin-label">שם משתשמש:</label>
-        <input id="signin-input" type="text" class="signin-input" />
-        <label for="signin-input" class="signin-label">סיסמא:</label>
+        <label for="signin-username" class="signin-label">שם משתשמש:</label>
+        <input
+          id="signin-username"
+          v-model="username"
+          type="text"
+          class="signin-input"
+          :class="{ 'invalid-field': !usernameValid }"
+          @keydown.enter="handleSignin"
+        />
+        <div v-if="!usernameValid" class="invalid-msg">{{ usernameError }}</div>
+
+        <label for="signin-password" class="signin-label">סיסמא:</label>
         <div class="password-wrapper">
           <input
-            id="signin-input"
+            id="signin-password"
+            v-model="password"
             :type="showPassword ? 'text' : 'password'"
             class="signin-input"
+            :class="{ 'invalid-field': !passwordValid }"
+            @keydown.enter="handleSignin"
           />
           <button type="button" class="eye-btn" @click="showPassword = !showPassword" tabindex="-1">
             <svg
@@ -52,13 +172,19 @@ const showPassword = ref(false)
             </svg>
           </button>
         </div>
-        <button class="signin-btn">
+        <div v-if="!passwordValid" class="invalid-msg">{{ passwordError }}</div>
+        <div v-if="wrongInputError" class="invalid-msg">{{ wrongInputError }}</div>
+        <div v-if="serverError" class="error-message">{{ serverError }}</div>
+        <button class="signin-btn" @click="handleSignin" :disabled="isSubmitting">
           <span>כניסה</span>
         </button>
         <p class="signup-link">
           אין לך חשבון? <RouterLink to="/signup">כאן יוצרים אחד</RouterLink>
         </p>
       </div>
+    </section>
+    <section v-if="isLoggedIn" class="signin-view" dir="rtl">
+      <h1>נראה שאתם מחוברים 😎</h1>
     </section>
   </main>
 </template>
@@ -159,8 +285,35 @@ main {
   width: 21%;
 }
 
+.signin-btn:disabled {
+  background: #aaa !important;
+  color: #fff !important;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .signin-btn:hover {
   background-color: #157347;
+}
+
+.error-message {
+  position: fixed;
+  top: 80px;
+  right: 0;
+  left: 0;
+  margin: 0 auto;
+  z-index: 9999;
+  width: fit-content;
+  color: #d63333;
+  font-size: 1.3rem;
+  font-weight: bold;
+  background: #fdecea;
+  border-radius: 6px;
+  padding: 0.7rem 1.2rem;
+  border: 1px solid #d63333;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  text-align: center;
+  white-space: pre-line;
 }
 
 .signup-link {
@@ -177,5 +330,17 @@ main {
 
 .signup-link a:hover {
   text-decoration: underline;
+}
+
+.invalid-field {
+  border: 2px solid #d63333 !important;
+}
+
+.invalid-msg {
+  color: #d63333;
+  font-size: 1rem;
+  margin-top: -0.7rem;
+  text-align: right;
+  width: 55%;
 }
 </style>

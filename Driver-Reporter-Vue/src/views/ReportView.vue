@@ -4,8 +4,7 @@ import Navbar from '../components/Nav-bar.vue'
 import PlateNumberInput from '../components/PlateNumberInput.vue'
 import Map from '../components/Map.vue'
 import { ref as vueRef } from 'vue'
-
-const plateNumber = ref('')
+import { useAuth } from '../stores/auth'
 
 const offenseTypes = ref([
   { value: 'red_light', text: 'רמזור אדום', icon: '🚦' },
@@ -18,24 +17,75 @@ const offenseTypes = ref([
   { value: 'other', text: 'אחר', icon: '💬' },
 ])
 
+const plateNumber = ref('')
 const selectedOffenseType = ref('')
 const reportDate = ref('')
 const reportTime = ref('')
 const description = ref('')
-const MAX_DESC = 300
 const checked = ref(false)
 
+const MAX_DESC = 300
 const mapRef = vueRef()
+
 const markerValid = ref(true)
+const plateNumberValid = ref(true)
 const offenseTypeValid = ref(true)
 const dateValid = ref(true)
 const descriptionValid = ref(true)
 const checkedValid = ref(true)
-const dateErrorMsg = ref('')
 
+const dateErrorMsg = ref('')
+const serverError = ref('')
 const showSuccess = ref(false)
 const isSubmitting = ref(false)
 const hasAttemptedSubmit = ref(false)
+
+const { isLoggedIn, username } = useAuth()
+
+let plateValidationRequestId = 0
+
+async function validatePlateNumber(plateNumber: string) {
+  const normalizedPlate = plateNumber.trim()
+  const currentUsername = username.value.trim()
+
+  if (!normalizedPlate || !currentUsername) {
+    return true
+  }
+
+  const requestId = ++plateValidationRequestId
+
+  try {
+    const res = await fetch(
+      `http://localhost:8000/api/v1/reports/plates/${encodeURIComponent(normalizedPlate)}/`,
+      {
+        method: 'GET',
+      },
+    )
+
+    if (!res.ok) {
+      return true
+    }
+
+    const data = (await res.json()) as { reports?: Array<{ user_name?: string }> }
+
+    // Ignore stale async responses when user keeps typing.
+    if (requestId !== plateValidationRequestId) {
+      return plateNumberValid.value
+    }
+
+    const alreadyReportedByUser =
+      Array.isArray(data.reports) &&
+      data.reports.some(
+        (report) =>
+          (report.user_name ?? '').trim().toLowerCase() === currentUsername.trim().toLowerCase(),
+      )
+
+    return !alreadyReportedByUser
+  } catch (err) {
+    console.error('Plate validation failed:', err)
+    return true
+  }
+}
 
 function validateDateTime(date: string, time: string) {
   if (!date || date.split('-').length !== 3) {
@@ -66,6 +116,10 @@ function validateDateTime(date: string, time: string) {
   dateErrorMsg.value = ''
   return true
 }
+
+watch(plateNumber, async (newVal) => {
+  plateNumberValid.value = await validatePlateNumber(newVal)
+})
 
 watch(selectedOffenseType, (newVal) => {
   if (hasAttemptedSubmit.value && newVal) {
@@ -114,8 +168,6 @@ watch(
   { deep: true },
 )
 
-const serverError = ref('')
-
 async function handleSend() {
   hasAttemptedSubmit.value = true
   serverError.value = ''
@@ -135,6 +187,7 @@ async function handleSend() {
     markerPos && Array.isArray(markerPos) && markerPos.length === 2 && markerPos[0] && markerPos[1]
 
   if (
+    !plateNumberValid.value ||
     !offenseTypeValid.value ||
     !dateValid.value ||
     !descriptionValid.value ||
@@ -142,7 +195,9 @@ async function handleSend() {
     !markerValid.value
   ) {
     setTimeout(() => {
-      const firstInvalid = document.querySelector('.invalid-field, .invalid-msg')
+      const firstInvalid = document.querySelector(
+        '.invalid-field, .invalid-msg, .invalid-plate-label',
+      )
       if (firstInvalid) {
         firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
@@ -153,7 +208,7 @@ async function handleSend() {
 
   try {
     const payload = {
-      user_name: 'lior', // Placeholder until we implement user accounts
+      user_name: username.value,
       plate_number: plateNumber.value,
       offense_type: (() => {
         const found = offenseTypes.value.find((o) => o.value === selectedOffenseType.value)
@@ -204,10 +259,13 @@ async function handleSend() {
 <template>
   <main>
     <Navbar />
-    <section class="report-view" dir="rtl">
+    <section v-if="isLoggedIn" class="report-view" dir="rtl">
       <h1>מדווחים. משפיעים.</h1>
       <PlateNumberInput @update:plateNumber="plateNumber = $event" />
-      <label class="plate-label">* לא חובה, רק אם בטוחים במספר</label>
+      <label v-if="plateNumberValid" class="plate-label">* לא חובה, רק אם בטוחים במספר</label>
+      <div v-if="!plateNumberValid" class="invalid-plate-label">
+        אופס! נראה שכבר דיווחת על מספר זה
+      </div>
       <select
         id="offense-type"
         v-model="selectedOffenseType"
@@ -277,6 +335,9 @@ async function handleSend() {
       <div v-if="showSuccess" class="success-message">הדיווח נוסף בהצלחה!</div>
       <div v-if="serverError" class="error-message">{{ serverError }}</div>
     </section>
+    <section v-if="!isLoggedIn" class="report-view" dir="rtl">
+      <h1>מתחברים. מדווחים. משפיעים.</h1>
+    </section>
   </main>
 </template>
 
@@ -296,7 +357,7 @@ main {
   color: #d63333;
   gap: 1rem;
   padding: 7rem 2rem 2rem 2rem;
-  max-width: 720px;
+  max-width: 950px;
 }
 
 .report-view h1 {
@@ -311,6 +372,15 @@ main {
   display: block;
   color: white;
   font-size: 1.1rem;
+  text-align: right;
+  width: 355px;
+  margin-top: -0.7rem;
+}
+
+.invalid-plate-label {
+  display: block;
+  color: #d63333;
+  font-size: 1rem;
   text-align: right;
   width: 355px;
   margin-top: -0.7rem;

@@ -164,6 +164,7 @@ watch(
   () => props.markers,
   (newMarkers) => {
     displayMarkers.forEach((m) => m.remove())
+    displayMarkers.length = 0
     if (newMarkers) {
       renderMarkers(newMarkers)
     }

@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Navbar from '../components/Nav-bar.vue'
+import { useAuth } from '../stores/auth'
 
 const router = useRouter()
 
@@ -16,12 +17,15 @@ const confirmPasswordValid = ref(true)
 const usernameError = ref('')
 const passwordError = ref('')
 const confirmPasswordError = ref('')
-
-const hasAttemptedSubmit = ref(false)
-const showPassword = ref(false)
-const showConfirm = ref(false)
 const serverError = ref('')
+
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
+
 const isSubmitting = ref(false)
+const hasAttemptedSubmit = ref(false)
+
+const { isLoggedIn } = useAuth()
 
 async function validateUsername(val: string) {
   if (!val.trim()) {
@@ -41,8 +45,7 @@ async function validateUsername(val: string) {
       usernameError.value = 'אופס! שם המשתמש כבר תפוס 😕 קצת מקוריות לא תזיק 😉'
       return false
     }
-  } catch {
-  }
+  } catch {}
   usernameError.value = ''
   return true
 }
@@ -130,7 +133,7 @@ async function handleSignup() {
       body: JSON.stringify({ username: username.value, password: password.value }),
     })
     if (res.status === 201) {
-      router.push('/')
+      await router.push('/')
     } else {
       const data = await res.json()
       serverError.value =
@@ -158,7 +161,7 @@ async function handleSignup() {
 <template>
   <main>
     <Navbar />
-    <section class="signup-view" dir="rtl">
+    <section v-if="!isLoggedIn" class="signup-view" dir="rtl">
       <h1>כאן יוצרים חשבון חדש.</h1>
       <div class="signup-content">
         <label for="signup-username" class="signup-label">שם משתשמש:</label>
@@ -218,15 +221,20 @@ async function handleSignup() {
         <div class="password-wrapper">
           <input
             id="signup-confirm"
-            :type="showConfirm ? 'text' : 'password'"
+            :type="showConfirmPassword ? 'text' : 'password'"
             class="signup-input"
             v-model="confirmPassword"
             :class="{ 'invalid-field': !confirmPasswordValid }"
             @paste.prevent
           />
-          <button type="button" class="eye-btn" @click="showConfirm = !showConfirm" tabindex="-1">
+          <button
+            type="button"
+            class="eye-btn"
+            @click="showConfirmPassword = !showConfirmPassword"
+            tabindex="-1"
+          >
             <svg
-              v-if="!showConfirm"
+              v-if="!showConfirmPassword"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               fill="none"
@@ -263,6 +271,9 @@ async function handleSignup() {
           יש לך כבר חשבון? <RouterLink to="/signin">כאן נכנסים אליו</RouterLink>
         </p>
       </div>
+    </section>
+    <section v-if="isLoggedIn" class="signup-view" dir="rtl">
+      <h1>נראה שאתם מחוברים 😎</h1>
     </section>
   </main>
 </template>
