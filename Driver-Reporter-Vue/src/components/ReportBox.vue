@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 
 const props = defineProps<{
   reportId?: number
@@ -14,7 +14,16 @@ const props = defineProps<{
 }>()
 
 const plateBadgeStyle = computed(() => {
-  const color = props.plateColor
+  let color = props.plateColor
+
+  if (!color) {
+    if (!props.plateNumber) return
+    else if (props.plateNumber?.startsWith('מ - ')) color = 'red'
+    else if (props.plateNumber?.startsWith('צ - ')) color = 'black'
+    else if (props.plateNumber?.startsWith('מצ - ')) color = 'blue'
+    else color = 'yellow'
+  }
+
   const isDark = color === 'black' || color === 'blue' || color === 'red'
 
   return {
@@ -32,6 +41,17 @@ const offenseLabelColor = computed(() => {
   return '#d63333'
 })
 
+const formattedDate = computed(() => {
+  const rawDate = (props.date ?? '').trim()
+  if (!rawDate) return '—'
+
+  const parts = rawDate.split('-')
+  if (parts.length !== 3) return rawDate
+
+  const [year, month, day] = parts
+  return `${day}-${month}-${year}`
+})
+
 function copyCoords() {
   if (props.latitude == null || props.longitude == null) return
   navigator.clipboard.writeText(`${props.latitude.toFixed(6)}, ${props.longitude.toFixed(6)}`)
@@ -41,7 +61,7 @@ function copyCoords() {
 <template>
   <div class="report-box" dir="rtl">
     <div class="report-box__header">
-      <span class="plate-badge" :style="plateBadgeStyle">{{ plateNumber || '—' }}</span>
+      <span class="plate-badge" :style="plateBadgeStyle">{{ plateNumber }}</span>
       <span class="offense-label" :style="{ color: offenseLabelColor }">{{
         offenseType || '—'
       }}</span>
@@ -52,7 +72,7 @@ function copyCoords() {
       <div class="field">
         <span class="field__icon">📅</span>
         <span class="field__label">תאריך</span>
-        <span class="field__value">{{ date || '—' }}</span>
+        <span class="field__value">{{ formattedDate }}</span>
       </div>
 
       <div class="field">
@@ -115,6 +135,7 @@ function copyCoords() {
   letter-spacing: 0.08em;
   padding: 0.25rem 0.8rem;
   border-radius: 6px;
+  min-height: 2.9rem;
   white-space: nowrap;
   direction: ltr;
 }

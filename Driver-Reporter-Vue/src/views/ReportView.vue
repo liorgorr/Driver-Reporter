@@ -42,8 +42,6 @@ const hasAttemptedSubmit = ref(false)
 
 const { isLoggedIn, username } = useAuth()
 
-let plateValidationRequestId = 0
-
 async function validatePlateNumber(plateNumber: string) {
   const normalizedPlate = plateNumber.trim()
   const currentUsername = username.value.trim()
@@ -51,8 +49,6 @@ async function validatePlateNumber(plateNumber: string) {
   if (!normalizedPlate || !currentUsername) {
     return true
   }
-
-  const requestId = ++plateValidationRequestId
 
   try {
     const res = await fetch(
@@ -68,16 +64,11 @@ async function validatePlateNumber(plateNumber: string) {
 
     const data = (await res.json()) as { reports?: Array<{ user_name?: string }> }
 
-    // Ignore stale async responses when user keeps typing.
-    if (requestId !== plateValidationRequestId) {
-      return plateNumberValid.value
-    }
-
     const alreadyReportedByUser =
       Array.isArray(data.reports) &&
       data.reports.some(
         (report) =>
-          (report.user_name ?? '').trim().toLowerCase() === currentUsername.trim().toLowerCase(),
+          (report.user_name ?? '').trim() === currentUsername.trim(),
       )
 
     return !alreadyReportedByUser
@@ -335,7 +326,7 @@ async function handleSend() {
       <div v-if="showSuccess" class="success-message">הדיווח נוסף בהצלחה!</div>
       <div v-if="serverError" class="error-message">{{ serverError }}</div>
     </section>
-    <section v-if="!isLoggedIn" class="report-view" dir="rtl">
+    <section v-else class="report-view" dir="rtl">
       <h1>מתחברים. מדווחים. משפיעים.</h1>
     </section>
   </main>

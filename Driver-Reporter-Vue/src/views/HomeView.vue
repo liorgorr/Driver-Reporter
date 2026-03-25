@@ -159,19 +159,17 @@ onMounted(() => {
         <button
           type="button"
           class="btn btn-warning d-flex align-items-center gap-2"
-          :class="{ active: activePanel === 'search' }"
           @click="togglePanels('search')"
         >
-          <img src="../assets/icons/licenceplate.png" width="30" height="30" alt="licence plate" />
+          <img src="../assets/icons/licenceplate.png" width="30" height="30" />
           <span :class="{ 'fw-bold': activePanel === 'search' }">חיפוש לפי מספר רכב</span>
         </button>
         <button
           type="button"
           class="btn btn-info d-flex align-items-center gap-2"
-          :class="{ active: activePanel === 'map' }"
           @click="togglePanels('map')"
         >
-          <img src="../assets/icons/map.png" width="30" height="30" alt="map" />
+          <img src="../assets/icons/map.png" width="30" height="30" />
           <span :class="{ 'fw-bold': activePanel === 'map' }">צפייה במפה</span>
         </button>
       </div>

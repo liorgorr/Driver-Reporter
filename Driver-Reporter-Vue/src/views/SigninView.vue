@@ -91,8 +91,8 @@ async function handleSignin() {
       } else {
         const data = await res.json()
         serverError.value =
-          'אופס! נראה שהשרת שלנו איבד את הדרך עם הדיווח שלך 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר'
-        console.error('Report submission error:', data)
+          'אופס! נראה שהשרת שלנו איבד את הדרך עם נסיון ההתחברות שלך 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר'
+        console.error('Signin error:', data)
         window.scrollTo({ top: 0, behavior: 'smooth' })
         setTimeout(() => {
           serverError.value = ''
@@ -183,7 +183,7 @@ async function handleSignin() {
         </p>
       </div>
     </section>
-    <section v-if="isLoggedIn" class="signin-view" dir="rtl">
+    <section v-else class="signin-view" dir="rtl">
       <h1>נראה שאתם מחוברים 😎</h1>
     </section>
   </main>
@@ -198,7 +198,6 @@ main {
   position: relative;
   width: 860px;
   min-height: calc(100vh - 7rem);
-  color: #d63333;
   padding: 7rem 2rem 2rem 2rem;
 }
 

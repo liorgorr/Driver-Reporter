@@ -148,3 +148,11 @@ class AllReportsView(APIView):
         serializer = ReportSerializer(reports, many=True)
         return Response({'reports': serializer.data})
        
+class CurrentUserReportsView(APIView):
+    """
+    GET /api/v1/reports/users/{user_name}/ — all reports created by the user
+    """
+    def get(self, request, user_name):
+        reports = Report.objects.filter(user_name=user_name)
+        serializer = ReportSerializer(reports, many=True)
+        return Response({'count': reports.count(), 'reports': serializer.data})

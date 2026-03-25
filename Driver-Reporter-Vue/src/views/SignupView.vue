@@ -25,7 +25,7 @@ const showConfirmPassword = ref(false)
 const isSubmitting = ref(false)
 const hasAttemptedSubmit = ref(false)
 
-const { isLoggedIn } = useAuth()
+const { isLoggedIn, syncAuthStatus } = useAuth()
 
 async function validateUsername(val: string) {
   if (!val.trim()) {
@@ -38,7 +38,7 @@ async function validateUsername(val: string) {
   }
   try {
     const res = await fetch(
-      `http://localhost:8000/api/v1/auth/check-username/?username=${encodeURIComponent(val)}`,
+      `http://localhost:8000/api/v1/auth/check-username/?username=${encodeURIComponent(val.trim())}`,
     )
     const data = await res.json()
     if (data.available === false) {
@@ -127,18 +127,32 @@ async function handleSignup() {
   serverError.value = ''
 
   try {
-    const res = await fetch('http://localhost:8000/api/v1/users/', {
+    const signupRes = await fetch('http://localhost:8000/api/v1/users/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: username.value, password: password.value }),
+      body: JSON.stringify({ username: username.value.trim(), password: password.value }),
     })
-    if (res.status === 201) {
+
+    const signinRes = await fetch('http://localhost:8000/api/v1/auth/login/', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: username.value.trim(),
+        password: password.value,
+      }),
+    })
+
+    if (signupRes.status === 201 && signinRes.ok) {
+      await syncAuthStatus()
       await router.push('/')
     } else {
-      const data = await res.json()
+      const data = await signupRes.json() + await signinRes.json()
       serverError.value =
-        'אופס! נראה שהשרת שלנו איבד את הדרך עם הדיווח שלך 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר'
-      console.error('Report submission error:', data)
+        'אופס! נראה שהשרת שלנו איבד את הדרך עם נסיון ההרשמה שלך 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר'
+      console.error('Signup error:', data)
       window.scrollTo({ top: 0, behavior: 'smooth' })
       setTimeout(() => {
         serverError.value = ''
@@ -272,7 +286,7 @@ async function handleSignup() {
         </p>
       </div>
     </section>
-    <section v-if="isLoggedIn" class="signup-view" dir="rtl">
+    <section v-else class="signup-view" dir="rtl">
       <h1>נראה שאתם מחוברים 😎</h1>
     </section>
   </main>
@@ -287,7 +301,6 @@ main {
   position: relative;
   width: 860px;
   min-height: calc(100vh - 7rem);
-  color: #d63333;
   padding: 7rem 2rem 2rem 2rem;
 }
 

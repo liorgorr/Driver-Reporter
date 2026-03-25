@@ -2,7 +2,7 @@ from django.db import models
 
 
 class Report(models.Model):
-    user_name = models.CharField(max_length=150, default='anonymous')
+    user_name = models.CharField(max_length=150)
     plate_number = models.CharField(max_length=20, blank=True, default='')
     offense_type = models.CharField(max_length=100)
     date = models.DateField()
