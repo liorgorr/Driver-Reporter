@@ -1,13 +1,14 @@
 from django.urls import path
-from .views import AuthStatusView, AuthCookieLoginView, AuthCookieLogoutView, MaxReportedPlateView, ReportCreateView, DistinctPlateCountView, ReportCountView, ReportsByPlateView, MaxReportedTypeView, AllReportsView, CheckUsernameView, CurrentUserReportsView
+from .views import AuthStatusView, AuthCookieLoginView, AuthCookieLogoutView, MaxReportedPlateView, ReportCreateView, DistinctPlateCountView, ReportCountView, ReportsByPlateView, MaxReportedTypeView, AllReportsView, CheckUsernameView, CurrentUserReportsView, PasswordChangeView
 
 urlpatterns = [
     path('auth/check-username/', CheckUsernameView.as_view(), name='check-username'),
+    path('auth/change-password/', PasswordChangeView.as_view(), name='change-password'),
     path('auth/status/', AuthStatusView.as_view(), name='auth-status'),
     path('auth/login/', AuthCookieLoginView.as_view(), name='auth-login'),
     path('auth/logout/', AuthCookieLogoutView.as_view(), name='auth-logout'),
     path('reports/create/', ReportCreateView.as_view(), name='report-create'),
-    path('reports/users/<str:user_name>/', CurrentUserReportsView.as_view(), name='current-user-reports'),
+    path('reports/users/me/', CurrentUserReportsView.as_view(), name='current-user-reports'),
     path('reports/distinct-plate-count/', DistinctPlateCountView.as_view(), name='distinct-plate-count'),
     path('reports/count/', ReportCountView.as_view(), name='count'),
     path('reports/max-reported-plate/', MaxReportedPlateView.as_view(), name='max-reported-plate'),

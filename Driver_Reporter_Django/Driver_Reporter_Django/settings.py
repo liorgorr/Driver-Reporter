@@ -10,23 +10,56 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _load_env_file(env_path: Path) -> None:
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding='utf-8').splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def _get_env(name: str, default: str | None = None, *, required: bool = False) -> str:
+    value = os.getenv(name, default)
+    if required and (value is None or value == ''):
+        raise ImproperlyConfigured(f'Missing required environment variable: {name}')
+    return value if value is not None else ''
+
+
+_load_env_file(BASE_DIR / '.env')
+
+try:
+    AUTH_TOKEN_TTL_SECONDS = int(_get_env('AUTH_TOKEN_TTL_SECONDS', '3600'))
+except ValueError as exc:
+    raise ImproperlyConfigured('AUTH_TOKEN_TTL_SECONDS must be an integer.') from exc
+
+if AUTH_TOKEN_TTL_SECONDS <= 0:
+    raise ImproperlyConfigured('AUTH_TOKEN_TTL_SECONDS must be greater than 0.')
+
+LOGIN_THROTTLE_RATE = _get_env('LOGIN_THROTTLE_RATE', '5/min')
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-qugyiryh@0hh=5k1wmow$9))#&2&z$v^*$jf!jid+*x=o7@__4'
+SECRET_KEY = _get_env('DJANGO_SECRET_KEY', required=True)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 ALLOWED_HOSTS = []
-
 
 # Application definition
 
@@ -51,6 +84,12 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+REST_FRAMEWORK = {
+    'DEFAULT_THROTTLE_RATES': {
+        'login': LOGIN_THROTTLE_RATE,
+    },
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -91,7 +130,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'drivers_report',
         'USER': 'postgres',
-        'PASSWORD': 'LiKoKo599',
+        'PASSWORD': _get_env('POSTGRES_PASSWORD', required=True),
         'HOST': 'localhost',
         'PORT': '5432'
     }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import Navbar from '../components/Nav-bar.vue'
 import PlateNumberInput from '../components/PlateNumberInput.vue'
 import Map from '../components/Map.vue'
@@ -40,7 +40,11 @@ const showSuccess = ref(false)
 const isSubmitting = ref(false)
 const hasAttemptedSubmit = ref(false)
 
-const { isLoggedIn, username } = useAuth()
+const { isLoggedIn, username, syncAuthStatus } = useAuth()
+
+onMounted(async () => {
+  await syncAuthStatus()
+  })
 
 async function validatePlateNumber(plateNumber: string) {
   const normalizedPlate = plateNumber.trim()
@@ -160,6 +164,12 @@ watch(
 )
 
 async function handleSend() {
+  await syncAuthStatus()
+
+  if (!isLoggedIn.value) {
+    return
+  }
+
   hasAttemptedSubmit.value = true
   serverError.value = ''
   isSubmitting.value = true
@@ -199,7 +209,6 @@ async function handleSend() {
 
   try {
     const payload = {
-      user_name: username.value,
       plate_number: plateNumber.value,
       offense_type: (() => {
         const found = offenseTypes.value.find((o) => o.value === selectedOffenseType.value)
@@ -214,6 +223,7 @@ async function handleSend() {
 
     const res = await fetch('http://localhost:8000/api/v1/reports/create/', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
@@ -348,7 +358,7 @@ main {
   color: #d63333;
   gap: 1rem;
   padding: 7rem 2rem 2rem 2rem;
-  max-width: 950px;
+  min-width: 960px;
 }
 
 .report-view h1 {
@@ -454,7 +464,7 @@ main {
   display: flex;
   flex-direction: row;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   width: 100%;
   gap: 0.5rem;
   margin-top: 1rem;
@@ -472,6 +482,7 @@ main {
   border-width: 0;
   padding: 0.3rem 0.6rem;
   transition: background 0.2s;
+  width: 20%;
 }
 
 .send-btn:hover {

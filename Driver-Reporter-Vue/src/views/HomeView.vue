@@ -256,7 +256,7 @@ main {
   color: #d63333;
   gap: 1rem;
   padding: 7rem 2rem 2rem 2rem;
-  max-width: 1400px;
+  min-width: 960px;
   width: 100%;
 }
 

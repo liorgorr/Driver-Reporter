@@ -6,9 +6,37 @@ from django.db.models import Count
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
 from rest_framework.authtoken.models import Token
 from .models import Report
 from .serializers import ReportSerializer
+from .throttles import LoginRateThrottle
+
+
+def _get_valid_token_from_cookie(request):
+    auth_token = request.COOKIES.get('authToken')
+    if not auth_token:
+        return None
+
+    try:
+        token = Token.objects.select_related('user').get(key=auth_token)
+    except Token.DoesNotExist:
+        return None
+
+    token_ttl = getattr(settings, 'AUTH_TOKEN_TTL_SECONDS', 3600)
+    if timezone.now() - token.created > timedelta(seconds=token_ttl):
+        token.delete()
+        return None
+
+    return token
+
+
+def _get_authenticated_user_from_cookie(request):
+    token = _get_valid_token_from_cookie(request)
+    if token is None:
+        return None
+    return token.user
 
 
 class AuthStatusView(APIView):
@@ -16,15 +44,11 @@ class AuthStatusView(APIView):
     GET /api/v1/auth/status/ — check if user is authenticated (verifies HttpOnly cookie token)
     """
     def get(self, request):
-        auth_token = request.COOKIES.get('authToken')
-        if not auth_token:
+        user = _get_authenticated_user_from_cookie(request)
+        if user is None:
             return Response({'authenticated': False}, status=status.HTTP_200_OK)
-        
-        try:
-            token = Token.objects.get(key=auth_token)
-            return Response({'authenticated': True, 'username': token.user.username}, status=status.HTTP_200_OK)
-        except Token.DoesNotExist:
-            return Response({'authenticated': False}, status=status.HTTP_200_OK)
+
+        return Response({'authenticated': True, 'username': user.username}, status=status.HTTP_200_OK)
 
 
 class AuthCookieLoginView(APIView):
@@ -32,6 +56,7 @@ class AuthCookieLoginView(APIView):
     POST /api/v1/auth/login/ — authenticate and set auth token in an HttpOnly cookie
     """
     permission_classes = [AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         username = (request.data.get('username') or '').strip()
@@ -47,10 +72,10 @@ class AuthCookieLoginView(APIView):
         response.set_cookie(
             key='authToken',
             value=token.key,
-            max_age=60*60,
+            max_age=settings.AUTH_TOKEN_TTL_SECONDS,
             httponly=True,
             secure=not settings.DEBUG,
-            samesite='Lax',
+            samesite='Strict',
             path='/',
         )
         return response
@@ -71,7 +96,7 @@ class AuthCookieLogoutView(APIView):
         response.delete_cookie(
             key='authToken',
             path='/',
-            samesite='Lax',
+            samesite='Strict',
         )
         return response
 
@@ -80,19 +105,57 @@ class CheckUsernameView(APIView):
     GET /api/v1/auth/check-username/?username=<username> — check if a username is available
     """
     def get(self, request):
-        username = request.query_params.get('username', '')
+        username = (request.query_params.get('username') or '').strip()
         exists = User.objects.filter(username=username).exists()
         return Response({'available': not exists})
 
+
+class PasswordChangeView(APIView):
+    """
+    PUT /api/v1/auth/change-password/ — change current authenticated user's password
+    """
+    permission_classes = [AllowAny]
+
+    def put(self, request):
+        token = _get_valid_token_from_cookie(request)
+        if token is None:
+            return Response({'detail': 'Invalid or expired auth token.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        new_password = (request.data.get('password') or '')
+        if not new_password:
+            return Response({'detail': 'Password is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = token.user
+        user.set_password(new_password)
+        user.save()
+
+        Token.objects.filter(user=user).delete()
+        refreshed_token = Token.objects.create(user=user)
+
+        response = Response({'detail': 'Password updated successfully.'}, status=status.HTTP_200_OK)
+        response.set_cookie(
+            key='authToken',
+            value=refreshed_token.key,
+            max_age=settings.AUTH_TOKEN_TTL_SECONDS,
+            httponly=True,
+            secure=not settings.DEBUG,
+            samesite='Strict',
+            path='/',
+        )
+        return response
 
 class ReportCreateView(APIView):
     """
     POST /api/v1/reports/create/ — create a new report
     """
     def post(self, request):
+        user = _get_authenticated_user_from_cookie(request)
+        if user is None:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+
         serializer = ReportSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(user_name=user.username)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -150,9 +213,13 @@ class AllReportsView(APIView):
        
 class CurrentUserReportsView(APIView):
     """
-    GET /api/v1/reports/users/{user_name}/ — all reports created by the user
+    GET /api/v1/reports/users/me/ — all reports created by the authenticated user
     """
-    def get(self, request, user_name):
-        reports = Report.objects.filter(user_name=user_name)
+    def get(self, request):
+        user = _get_authenticated_user_from_cookie(request)
+        if user is None:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        reports = Report.objects.filter(user_name=user.username)
         serializer = ReportSerializer(reports, many=True)
         return Response({'count': reports.count(), 'reports': serializer.data})

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Navbar from '../components/Nav-bar.vue'
 import { useAuth } from '../stores/auth'
@@ -26,6 +26,10 @@ const isSubmitting = ref(false)
 const hasAttemptedSubmit = ref(false)
 
 const { isLoggedIn, syncAuthStatus } = useAuth()
+
+onMounted(async () => {
+  await syncAuthStatus()
+})
 
 async function validateUsername(val: string) {
   if (!val.trim()) {
@@ -93,7 +97,10 @@ function validateConfirm(val: string) {
 }
 
 watch(username, async (val) => {
-  if (hasAttemptedSubmit.value) usernameValid.value = await validateUsername(val)
+  if (hasAttemptedSubmit.value) {
+    usernameValid.value = await validateUsername(val)
+    passwordValid.value = validatePassword(password.value)
+  }
 })
 
 watch(password, (val) => {
@@ -108,6 +115,12 @@ watch(confirmPassword, (val) => {
 })
 
 async function handleSignup() {
+  await syncAuthStatus()
+
+  if (isLoggedIn.value) {
+    return
+  }
+
   hasAttemptedSubmit.value = true
   isSubmitting.value = true
 
@@ -149,7 +162,7 @@ async function handleSignup() {
       await syncAuthStatus()
       await router.push('/')
     } else {
-      const data = await signupRes.json() + await signinRes.json()
+      const data = (await signupRes.json()) + (await signinRes.json())
       serverError.value =
         'אופס! נראה שהשרת שלנו איבד את הדרך עם נסיון ההרשמה שלך 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר'
       console.error('Signup error:', data)
@@ -287,7 +300,7 @@ async function handleSignup() {
       </div>
     </section>
     <section v-else class="signup-view" dir="rtl">
-      <h1>נראה שאתם מחוברים 😎</h1>
+      <h1>נראה שאתם כבר מחוברים 😎</h1>
     </section>
   </main>
 </template>
@@ -299,7 +312,7 @@ main {
 
 .signup-view {
   position: relative;
-  width: 860px;
+  min-width: 960px;
   min-height: calc(100vh - 7rem);
   padding: 7rem 2rem 2rem 2rem;
 }
@@ -327,7 +340,7 @@ main {
 
 .password-wrapper {
   position: relative;
-  width: 55%;
+  width: 50%;
   margin-bottom: 0.5rem;
 }
 
@@ -362,7 +375,7 @@ main {
 }
 
 .signup-input {
-  width: 55%;
+  width: 50%;
   height: 45px;
   font-size: 1.1rem;
   padding: 0.5rem 1rem;
@@ -372,7 +385,7 @@ main {
 .signup-label {
   font-size: 1.1rem;
   color: white;
-  width: 55%;
+  width: 50%;
   text-align: right;
 }
 
@@ -384,7 +397,7 @@ main {
   padding: 0.3rem 0.6rem;
   transition: background 0.2s;
   margin-top: 2rem;
-  width: 21%;
+  width: 20%;
 }
 
 .signup-btn:disabled {
@@ -443,6 +456,6 @@ main {
   font-size: 1rem;
   margin-top: -0.7rem;
   text-align: right;
-  width: 55%;
+  width: 50%;
 }
 </style>

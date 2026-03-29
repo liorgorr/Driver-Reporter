@@ -31,7 +31,7 @@ main {
   color: #d63333;
   gap: 1rem;
   padding: 7rem 2rem 2rem 2rem;
-  max-width: 1200px;
+  min-width: 960px;
 }
 
 .about-view h1 {

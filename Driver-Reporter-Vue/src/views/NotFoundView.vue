@@ -28,7 +28,7 @@ main {
   flex-direction: column;
   gap: 1rem;
   position: relative;
-  width: 880px;
+  min-width: 960px;
   padding: 7rem 2rem 2rem 2rem;
 }
 

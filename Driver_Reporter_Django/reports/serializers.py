@@ -16,4 +16,4 @@ class ReportSerializer(serializers.ModelSerializer):
             'latitude_coordinate',
             'longitude_coordinate',
         ]
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'user_name']

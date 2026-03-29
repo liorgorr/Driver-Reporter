@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Navbar from '../components/Nav-bar.vue'
 import { useAuth } from '../stores/auth'
@@ -23,6 +23,10 @@ const isSubmitting = ref(false)
 const hasAttemptedSubmit = ref(false)
 
 const { isLoggedIn, syncAuthStatus } = useAuth()
+
+onMounted(async () => {
+  await syncAuthStatus()
+  })
 
 function validateUsername(val: string) {
   if (!val) {
@@ -51,6 +55,12 @@ watch(password, (val) => {
 })
 
 async function handleSignin() {
+  await syncAuthStatus()
+
+  if (isLoggedIn.value) {
+    return
+  }
+
   hasAttemptedSubmit.value = true
   isSubmitting.value = true
 
@@ -88,6 +98,8 @@ async function handleSignin() {
     } else {
       if (res.status === 401) {
         wrongInputError.value = 'אופס! נראה ששם המשתמש ו/או הסיסמא שגויים 😕'
+      } else if (res.status === 429) {
+        wrongInputError.value = 'אופס! נראה שלא הצלחתם להתחבר יותר מידי פעמים, נסו שוב בעוד דקה 😕'
       } else {
         const data = await res.json()
         serverError.value =
@@ -184,7 +196,7 @@ async function handleSignin() {
       </div>
     </section>
     <section v-else class="signin-view" dir="rtl">
-      <h1>נראה שאתם מחוברים 😎</h1>
+      <h1>נראה שאתם כבר מחוברים 😎</h1>
     </section>
   </main>
 </template>
@@ -196,7 +208,7 @@ main {
 
 .signin-view {
   position: relative;
-  width: 860px;
+  min-width: 960px;
   min-height: calc(100vh - 7rem);
   padding: 7rem 2rem 2rem 2rem;
 }
@@ -224,7 +236,7 @@ main {
 
 .password-wrapper {
   position: relative;
-  width: 55%;
+  width: 50%;
   margin-bottom: 1rem;
 }
 
@@ -259,7 +271,7 @@ main {
 }
 
 .signin-input {
-  width: 55%;
+  width: 50%;
   height: 45px;
   font-size: 1.1rem;
   padding: 0.5rem 1rem;
@@ -269,7 +281,7 @@ main {
 .signin-label {
   font-size: 1.1rem;
   color: white;
-  width: 55%;
+  width: 50%;
   text-align: right;
 }
 
@@ -281,7 +293,7 @@ main {
   padding: 0.3rem 0.6rem;
   transition: background 0.2s;
   margin-top: 2rem;
-  width: 21%;
+  width: 20%;
 }
 
 .signin-btn:disabled {
@@ -340,6 +352,6 @@ main {
   font-size: 1rem;
   margin-top: -0.7rem;
   text-align: right;
-  width: 55%;
+  width: 50%;
 }
 </style>

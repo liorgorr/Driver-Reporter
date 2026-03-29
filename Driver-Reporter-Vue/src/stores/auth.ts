@@ -12,18 +12,17 @@ async function syncAuthStatus() {
   isSyncingAuth.value = true
 
   try {
-    const response = await fetch('http://localhost:8000/api/v1/auth/status/', {
-      method: 'GET',
+    const res = await fetch('http://localhost:8000/api/v1/auth/status/', {
       credentials: 'include',
     })
 
-    if (!response.ok) {
+    if (!res.ok) {
       isLoggedIn.value = false
       username.value = ''
       return
     }
 
-    const data = (await response.json()) as { authenticated?: boolean; username?: string }
+    const data = (await res.json()) as { authenticated?: boolean; username?: string }
     isLoggedIn.value = data.authenticated === true
     username.value = data.authenticated === true ? (data.username ?? '') : ''
   } catch (err) {
