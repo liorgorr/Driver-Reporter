@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import Navbar from '../components/Nav-bar.vue'
+import { apiUrl } from '../utils/api'
 
 const distinctPlateCount = ref<number>(0)
 const reportCount = ref<number>(0)
@@ -23,7 +24,7 @@ function animateCount(target: number, parameter: { value: any }, duration = 2000
 
 onMounted(async () => {
   try {
-    var res = await fetch('http://localhost:8000/api/v1/reports/distinct-plate-count/')
+    var res = await fetch(apiUrl('/api/v1/reports/distinct-plate-count/'))
     if (res.ok) {
       const data = await res.json()
       animateCount(data.count, distinctPlateCount)
@@ -32,7 +33,7 @@ onMounted(async () => {
     console.error('Failed to fetch distinct plate count:', err)
   }
   try {
-    var res = await fetch('http://localhost:8000/api/v1/reports/count/')
+    var res = await fetch(apiUrl('/api/v1/reports/count/'))
     if (res.ok) {
       const data = await res.json()
       animateCount(data.count, reportCount)
@@ -41,7 +42,7 @@ onMounted(async () => {
     console.error('Failed to fetch report count:', err)
   }
   try {
-    res = await fetch('http://localhost:8000/api/v1/reports/max-reported-plate/')
+    res = await fetch(apiUrl('/api/v1/reports/max-reported-plate/'))
     if (res.ok) {
       const data = await res.json()
       const raw: string = data.maxReported['plate_number']
@@ -55,7 +56,7 @@ onMounted(async () => {
     console.error('Failed to fetch max reported plate:', err)
   }
   try {
-    res = await fetch('http://localhost:8000/api/v1/reports/max-reported-type/')
+    res = await fetch(apiUrl('/api/v1/reports/max-reported-type/'))
     if (res.ok) {
       const data = await res.json()
       maxReportedType.value = data.maxReported['offense_type']

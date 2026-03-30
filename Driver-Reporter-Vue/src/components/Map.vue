@@ -39,6 +39,83 @@ function offenseColor(offenseType: string): string {
   return '#d63333'
 }
 
+function createPopupContent(m: MapMarker): HTMLDivElement {
+  const container = document.createElement('div')
+  container.style.fontFamily = 'Assistant, sans-serif'
+  container.style.minWidth = '140px'
+  container.style.textAlign = 'right'
+
+  const idLine = document.createElement('span')
+  idLine.style.display = 'block'
+  idLine.style.direction = 'ltr'
+  idLine.style.textAlign = 'left'
+  idLine.textContent = `#${m.id}`
+  container.appendChild(idLine)
+
+  const plateLine = document.createElement('div')
+  const plateValue = document.createElement('strong')
+  plateValue.textContent = m.plateNumber || 'לא צוין מספר רכב'
+  plateLine.appendChild(plateValue)
+
+  if (m.plateNumber) {
+    const copyBtn = document.createElement('button')
+    copyBtn.type = 'button'
+    copyBtn.title = 'העתקה'
+    copyBtn.textContent = '📋'
+    copyBtn.style.marginRight = '6px'
+    copyBtn.style.background = 'none'
+    copyBtn.style.border = 'none'
+    copyBtn.style.cursor = 'pointer'
+    copyBtn.style.fontSize = '0.85rem'
+    copyBtn.style.opacity = '0.7'
+    copyBtn.style.verticalAlign = 'middle'
+    copyBtn.style.padding = '0'
+    copyBtn.addEventListener('mouseenter', () => {
+      copyBtn.style.opacity = '1'
+    })
+    copyBtn.addEventListener('mouseleave', () => {
+      copyBtn.style.opacity = '0.7'
+    })
+    copyBtn.addEventListener('click', () => {
+      const digitsOnly = m.plateNumber?.replace(/[^\d]/g, '') ?? ''
+      if (!digitsOnly || !navigator.clipboard) {
+        return
+      }
+      void navigator.clipboard.writeText(digitsOnly)
+    })
+    plateLine.appendChild(copyBtn)
+  }
+
+  container.appendChild(plateLine)
+
+  const offenseLine = document.createElement('span')
+  offenseLine.textContent = m.offenseType
+  container.appendChild(offenseLine)
+  container.appendChild(document.createElement('br'))
+
+  const dateLine = document.createElement('strong')
+  dateLine.textContent = `תאריך: ${m.date ? m.date.split('-').reverse().join('-') : 'לא צוין'}`
+  container.appendChild(dateLine)
+  container.appendChild(document.createElement('br'))
+
+  const timeLine = document.createElement('strong')
+  timeLine.textContent = `שעה: ${m.time ? m.time.slice(0, 5) : 'לא צוינה שעה'}`
+  container.appendChild(timeLine)
+  container.appendChild(document.createElement('br'))
+
+  const descriptionLine = document.createElement('span')
+  descriptionLine.style.fontSize = '0.85em'
+  descriptionLine.style.color = '#555'
+  descriptionLine.style.wordBreak = 'break-word'
+  const descriptionLabel = document.createElement('strong')
+  descriptionLabel.textContent = 'תיאור: '
+  descriptionLine.appendChild(descriptionLabel)
+  descriptionLine.appendChild(document.createTextNode(m.description || 'לא צוין תיאור'))
+  container.appendChild(descriptionLine)
+
+  return container
+}
+
 function renderMarkers(markers: MapMarker[]) {
   if (!map) return
   markers.forEach((m) => {
@@ -49,19 +126,7 @@ function renderMarkers(markers: MapMarker[]) {
       iconSize: [12, 12],
       iconAnchor: [6, 6],
     })
-    const lm = L.marker([m.lat, m.lng], { icon })
-      .addTo(map!)
-      .bindPopup(
-        `<div style="font-family:Assistant,sans-serif;min-width:140px;text-align:right">
-          <span style="display:block;direction:ltr;text-align:left">#${m.id}</span>
-          <strong>${m.plateNumber || 'לא צוין מספר רכב'}</strong>
-          ${m.plateNumber ? `<button onclick="navigator.clipboard.writeText('${m.plateNumber.replace(/[^\d]/g, '')}')" title="העתקה" style="margin-right:6px;background:none;border:none;cursor:pointer;font-size:0.85rem;opacity:0.7;vertical-align:middle;padding:0" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.7">📋</button>` : ''}<br/>
-          <span>${m.offenseType}</span>
-          <br/><strong>תאריך: ${m.date ? m.date.split('-').reverse().join('-') : 'לא צוין'}</strong>
-          <br/><strong>שעה: ${m.time ? m.time.slice(0, 5) : 'לא צוינה שעה'}</strong>
-          <br/><span style="font-size:0.85em;color:#555;word-break:break-word"><strong>תיאור:</strong> ${m.description || 'לא צוין תיאור'}</span>   
-        </div>`,
-      )
+    const lm = L.marker([m.lat, m.lng], { icon }).addTo(map!).bindPopup(createPopupContent(m))
     displayMarkers.push(lm)
   })
 }

@@ -5,6 +5,8 @@ import PlateNumberInput from '../components/PlateNumberInput.vue'
 import Map from '../components/Map.vue'
 import { ref as vueRef } from 'vue'
 import { useAuth } from '../stores/auth'
+import { getCsrfHeaders } from '../utils/csrf'
+import { apiUrl } from '../utils/api'
 
 const offenseTypes = ref([
   { value: 'red_light', text: 'רמזור אדום', icon: '🚦' },
@@ -40,7 +42,7 @@ const showSuccess = ref(false)
 const isSubmitting = ref(false)
 const hasAttemptedSubmit = ref(false)
 
-const { isLoggedIn, username, syncAuthStatus } = useAuth()
+const { isLoggedIn, syncAuthStatus } = useAuth()
 
 onMounted(async () => {
   await syncAuthStatus()
@@ -48,17 +50,17 @@ onMounted(async () => {
 
 async function validatePlateNumber(plateNumber: string) {
   const normalizedPlate = plateNumber.trim()
-  const currentUsername = username.value.trim()
 
-  if (!normalizedPlate || !currentUsername) {
+  if (!normalizedPlate) {
     return true
   }
 
   try {
     const res = await fetch(
-      `http://localhost:8000/api/v1/reports/plates/${encodeURIComponent(normalizedPlate)}/`,
+      apiUrl(`/api/v1/reports/plates/${encodeURIComponent(normalizedPlate)}/`),
       {
         method: 'GET',
+        credentials: 'include',
       },
     )
 
@@ -66,16 +68,8 @@ async function validatePlateNumber(plateNumber: string) {
       return true
     }
 
-    const data = (await res.json()) as { reports?: Array<{ user_name?: string }> }
-
-    const alreadyReportedByUser =
-      Array.isArray(data.reports) &&
-      data.reports.some(
-        (report) =>
-          (report.user_name ?? '').trim() === currentUsername.trim(),
-      )
-
-    return !alreadyReportedByUser
+    const data = (await res.json()) as { reported_by_current_user?: boolean }
+    return data.reported_by_current_user !== true
   } catch (err) {
     console.error('Plate validation failed:', err)
     return true
@@ -95,13 +89,14 @@ function validateDateTime(date: string, time: string) {
   }
 
   const now = new Date()
-  const oneMonthAgo = new Date()
-  oneMonthAgo.setMonth(now.getMonth() - 1)
 
   if (selectedDateTime > now) {
     dateErrorMsg.value = 'מזל טוב! נראה שבנית מכונת זמן כי הזמן או התאריך שבחרת עוד לא הגיעו'
     return false
   }
+
+  const oneMonthAgo = new Date()
+  oneMonthAgo.setMonth(now.getMonth() - 1)
 
   if (selectedDateTime < oneMonthAgo) {
     dateErrorMsg.value = 'אופס! לא ניתן למלא דיווח על אירוע שקרה יותר מלפני חודש'
@@ -221,10 +216,10 @@ async function handleSend() {
       longitude_coordinate: markerPos[1],
     }
 
-    const res = await fetch('http://localhost:8000/api/v1/reports/create/', {
+    const res = await fetch(apiUrl('/api/v1/reports/create/'), {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getCsrfHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload),
     })
 

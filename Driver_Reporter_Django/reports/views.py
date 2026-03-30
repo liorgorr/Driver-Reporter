@@ -5,7 +5,10 @@ from rest_framework.permissions import AllowAny
 from django.db.models import Count
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
 from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.middleware.csrf import CsrfViewMiddleware, get_token
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework.authtoken.models import Token
@@ -31,12 +34,23 @@ def _get_valid_token_from_cookie(request):
 
     return token
 
-
 def _get_authenticated_user_from_cookie(request):
     token = _get_valid_token_from_cookie(request)
     if token is None:
         return None
     return token.user
+
+
+def _enforce_csrf(request):
+    failure = CsrfViewMiddleware(lambda req: None).process_view(
+        request,
+        lambda req: None,
+        (),
+        {},
+    )
+    if failure is not None:
+        return Response({'detail': 'CSRF validation failed.'}, status=status.HTTP_403_FORBIDDEN)
+    return None
 
 
 class AuthStatusView(APIView):
@@ -51,6 +65,52 @@ class AuthStatusView(APIView):
         return Response({'authenticated': True, 'username': user.username}, status=status.HTTP_200_OK)
 
 
+class AuthCsrfView(APIView):
+    """
+    GET /api/v1/auth/csrf/ — issue CSRF cookie for SPA requests
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        get_token(request)
+        return Response({'detail': 'CSRF cookie set.'}, status=status.HTTP_200_OK)
+
+
+class AuthSignupView(APIView):
+    """
+    POST /api/v1/auth/signup/ — create a new user account
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        csrf_failure = _enforce_csrf(request)
+        if csrf_failure is not None:
+            return csrf_failure
+
+        username = (request.data.get('username') or '').strip()
+        password = request.data.get('password') or ''
+
+        if not username:
+            return Response({'username': ['This field is required.']}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not password:
+            return Response({'password': ['This field is required.']}, status=status.HTTP_400_BAD_REQUEST)
+
+        if User.objects.filter(username=username).exists():
+            return Response(
+                {'username': ['A user with that username already exists.']},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            validate_password(password, user=User(username=username))
+        except DjangoValidationError as exc:
+            return Response({'password': list(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        User.objects.create_user(username=username, password=password)
+        return Response({'detail': 'User created successfully.'}, status=status.HTTP_201_CREATED)
+
+
 class AuthCookieLoginView(APIView):
     """
     POST /api/v1/auth/login/ — authenticate and set auth token in an HttpOnly cookie
@@ -59,6 +119,10 @@ class AuthCookieLoginView(APIView):
     throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
+        csrf_failure = _enforce_csrf(request)
+        if csrf_failure is not None:
+            return csrf_failure
+
         username = (request.data.get('username') or '').strip()
         password = request.data.get('password') or ''
 
@@ -88,6 +152,10 @@ class AuthCookieLogoutView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        csrf_failure = _enforce_csrf(request)
+        if csrf_failure is not None:
+            return csrf_failure
+
         auth_token = request.COOKIES.get('authToken')
         if auth_token:
             Token.objects.filter(key=auth_token).delete()
@@ -117,6 +185,10 @@ class PasswordChangeView(APIView):
     permission_classes = [AllowAny]
 
     def put(self, request):
+        csrf_failure = _enforce_csrf(request)
+        if csrf_failure is not None:
+            return csrf_failure
+
         token = _get_valid_token_from_cookie(request)
         if token is None:
             return Response({'detail': 'Invalid or expired auth token.'}, status=status.HTTP_401_UNAUTHORIZED)
@@ -126,6 +198,11 @@ class PasswordChangeView(APIView):
             return Response({'detail': 'Password is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
         user = token.user
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as exc:
+            return Response({'password': list(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
         user.set_password(new_password)
         user.save()
 
@@ -149,6 +226,10 @@ class ReportCreateView(APIView):
     POST /api/v1/reports/create/ — create a new report
     """
     def post(self, request):
+        csrf_failure = _enforce_csrf(request)
+        if csrf_failure is not None:
+            return csrf_failure
+
         user = _get_authenticated_user_from_cookie(request)
         if user is None:
             return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
@@ -190,8 +271,16 @@ class ReportsByPlateView(APIView):
     """
     def get(self, request, plate_number):
         reports = Report.objects.exclude(plate_number='').filter(plate_number=plate_number)
+        user = _get_authenticated_user_from_cookie(request)
+        reported_by_current_user = False
+        if user is not None:
+            reported_by_current_user = reports.filter(user_name=user.username).exists()
         serializer = ReportSerializer(reports, many=True)
-        return Response({'count': reports.count(), 'reports': serializer.data})
+        return Response({
+            'count': reports.count(),
+            'reported_by_current_user': reported_by_current_user,
+            'reports': serializer.data,
+        })
 
 class MaxReportedTypeView(APIView):
     """

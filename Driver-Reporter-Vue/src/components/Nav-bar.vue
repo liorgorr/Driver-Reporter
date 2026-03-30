@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { useAuth } from '../stores/auth'
+import { getCsrfHeaders } from '../utils/csrf'
+import { apiUrl } from '../utils/api'
 
 const { isLoggedIn, syncAuthStatus } = useAuth()
 const router = useRouter()
 
 async function handleSignout() {
   try {
-    await fetch('http://localhost:8000/api/v1/auth/logout/', {
+    await fetch(apiUrl('/api/v1/auth/logout/'), {
       method: 'POST',
       credentials: 'include',
+      headers: await getCsrfHeaders(),
     })
     await syncAuthStatus()
   } catch (err) {

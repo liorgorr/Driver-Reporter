@@ -1,8 +1,10 @@
 from django.urls import path
-from .views import AuthStatusView, AuthCookieLoginView, AuthCookieLogoutView, MaxReportedPlateView, ReportCreateView, DistinctPlateCountView, ReportCountView, ReportsByPlateView, MaxReportedTypeView, AllReportsView, CheckUsernameView, CurrentUserReportsView, PasswordChangeView
+from .views import AuthStatusView, AuthCsrfView, AuthSignupView, AuthCookieLoginView, AuthCookieLogoutView, MaxReportedPlateView, ReportCreateView, DistinctPlateCountView, ReportCountView, ReportsByPlateView, MaxReportedTypeView, AllReportsView, CheckUsernameView, CurrentUserReportsView, PasswordChangeView
 
 urlpatterns = [
+    path('auth/csrf/', AuthCsrfView.as_view(), name='auth-csrf'),
     path('auth/check-username/', CheckUsernameView.as_view(), name='check-username'),
+    path('auth/signup/', AuthSignupView.as_view(), name='auth-signup'),
     path('auth/change-password/', PasswordChangeView.as_view(), name='change-password'),
     path('auth/status/', AuthStatusView.as_view(), name='auth-status'),
     path('auth/login/', AuthCookieLoginView.as_view(), name='auth-login'),

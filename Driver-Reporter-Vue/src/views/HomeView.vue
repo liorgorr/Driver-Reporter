@@ -5,6 +5,7 @@ import Map from '../components/Map.vue'
 import type { MapMarker } from '../components/Map.vue'
 import PlateNumberInput from '../components/PlateNumberInput.vue'
 import ReportBox from '../components/ReportBox.vue'
+import { apiUrl } from '../utils/api'
 
 const activePanel = ref<'none' | 'search' | 'map'>('none')
 const distinctPlateCount = ref<number>(0)
@@ -22,7 +23,7 @@ function animateCount(target: number, duration = 2000) {
 
 onMounted(async () => {
   try {
-    const res = await fetch('http://localhost:8000/api/v1/reports/distinct-plate-count/')
+    const res = await fetch(apiUrl('/api/v1/reports/distinct-plate-count/'))
     if (res.ok) {
       const data = await res.json()
       animateCount(data.count)
@@ -69,7 +70,7 @@ watch(plateNumber, (newVal) => {
 
     try {
       const res = await fetch(
-        `http://localhost:8000/api/v1/reports/plates/${encodeURIComponent(newVal)}/`,
+        apiUrl(`/api/v1/reports/plates/${encodeURIComponent(newVal)}/`),
         { signal },
       )
       if (res.ok) {
@@ -112,7 +113,7 @@ const filteredReports = computed(() => {
 async function fetchAllReports() {
   if (allReports.value.length > 0) return
   try {
-    const res = await fetch('http://localhost:8000/api/v1/reports/all/')
+    const res = await fetch(apiUrl('/api/v1/reports/all/'))
     if (res.ok) {
       const data = await res.json()
       allReports.value = data.reports.map((r: Report) => ({

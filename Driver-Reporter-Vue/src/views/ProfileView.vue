@@ -3,6 +3,8 @@ import Navbar from '../components/Nav-bar.vue'
 import { ref, onMounted, watch } from 'vue'
 import ReportBox from '../components/ReportBox.vue'
 import { useAuth } from '../stores/auth'
+import { getCsrfHeaders } from '../utils/csrf'
+import { apiUrl } from '../utils/api'
 
 const activePanel = ref<'none' | 'password' | 'reports'>('none')
 
@@ -51,7 +53,7 @@ onMounted(async () => {
   }
 
   try {
-    const res = await fetch('http://localhost:8000/api/v1/reports/users/me/', {
+    const res = await fetch(apiUrl('/api/v1/reports/users/me/'), {
       credentials: 'include',
     })
     if (res.ok) {
@@ -143,10 +145,10 @@ async function handlePasswordChange() {
   serverError.value = ''
 
   try {
-    const res = await fetch('http://localhost:8000/api/v1/auth/change-password/', {
+    const res = await fetch(apiUrl('/api/v1/auth/change-password/'), {
       method: 'PUT',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getCsrfHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ password: password.value }),
     })
 

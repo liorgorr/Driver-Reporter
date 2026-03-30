@@ -3,6 +3,8 @@ import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Navbar from '../components/Nav-bar.vue'
 import { useAuth } from '../stores/auth'
+import { getCsrfHeaders } from '../utils/csrf'
+import { apiUrl } from '../utils/api'
 
 const router = useRouter()
 
@@ -80,12 +82,10 @@ async function handleSignin() {
   serverError.value = ''
 
   try {
-    const res = await fetch('http://localhost:8000/api/v1/auth/login/', {
+    const res = await fetch(apiUrl('/api/v1/auth/login/'), {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: await getCsrfHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         username: username.value.trim(),
         password: password.value,

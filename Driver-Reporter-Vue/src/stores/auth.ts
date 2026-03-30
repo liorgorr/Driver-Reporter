@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { apiUrl } from '../utils/api'
 
 const isLoggedIn = ref<boolean>(false)
 const username = ref<string>('')
@@ -12,7 +13,7 @@ async function syncAuthStatus() {
   isSyncingAuth.value = true
 
   try {
-    const res = await fetch('http://localhost:8000/api/v1/auth/status/', {
+    const res = await fetch(apiUrl('/api/v1/auth/status/'), {
       credentials: 'include',
     })
 
