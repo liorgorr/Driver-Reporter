@@ -8,6 +8,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import DataError, IntegrityError
 from django.middleware.csrf import CsrfViewMiddleware, get_token
 from django.utils import timezone
 from datetime import timedelta
@@ -96,6 +97,12 @@ class AuthSignupView(APIView):
         if not password:
             return Response({'password': ['This field is required.']}, status=status.HTTP_400_BAD_REQUEST)
 
+        username_field = User._meta.get_field('username')
+        try:
+            username_field.run_validators(username)
+        except DjangoValidationError as exc:
+            return Response({'username': list(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
         if User.objects.filter(username=username).exists():
             return Response(
                 {'username': ['A user with that username already exists.']},
@@ -106,7 +113,7 @@ class AuthSignupView(APIView):
             validate_password(password, user=User(username=username))
         except DjangoValidationError as exc:
             return Response({'password': list(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
-
+     
         User.objects.create_user(username=username, password=password)
         return Response({'detail': 'User created successfully.'}, status=status.HTTP_201_CREATED)
 
@@ -234,7 +241,10 @@ class ReportCreateView(APIView):
         if user is None:
             return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        serializer = ReportSerializer(data=request.data)
+        serializer = ReportSerializer(
+            data=request.data,
+            context={'authenticated_user': user},
+        )
         if serializer.is_valid():
             serializer.save(user_name=user.username)
             return Response(serializer.data, status=status.HTTP_201_CREATED)

@@ -99,7 +99,7 @@ async function handleSignin() {
       if (res.status === 401) {
         wrongInputError.value = 'אופס! נראה ששם המשתמש ו/או הסיסמא שגויים 😕'
       } else if (res.status === 429) {
-        wrongInputError.value = 'אופס! נראה שלא הצלחתם להתחבר יותר מידי פעמים, נסו שוב בעוד דקה 😕'
+        wrongInputError.value = 'אופס! נראה שלא הצלחת להתחבר יותר מידי פעמים, נסו שוב בעוד דקה 😕'
       } else {
         const data = await res.json()
         serverError.value =

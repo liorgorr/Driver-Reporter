@@ -3,11 +3,11 @@ from django.db import models
 
 class Report(models.Model):
     user_name = models.CharField(max_length=150)
-    plate_number = models.CharField(max_length=20, blank=True, default='')
-    offense_type = models.CharField(max_length=100)
+    plate_number = models.CharField(blank=True, default='')
+    offense_type = models.CharField()
     date = models.DateField()
     time = models.TimeField(null=True, blank=True)
-    description = models.TextField(blank=True, default='')
+    description = models.TextField(max_length=300, blank=True, default='')
     latitude_coordinate = models.FloatField()
     longitude_coordinate = models.FloatField()
 

@@ -46,7 +46,7 @@ const { isLoggedIn, syncAuthStatus } = useAuth()
 
 onMounted(async () => {
   await syncAuthStatus()
-  })
+})
 
 async function validatePlateNumber(plateNumber: string) {
   const normalizedPlate = plateNumber.trim()
@@ -178,7 +178,7 @@ async function handleSend() {
     descriptionValid.value = true
   }
   checkedValid.value = !!checked.value
-  let markerPos = mapRef.value?.markerPosition
+  const markerPos = mapRef.value?.markerPosition
   markerValid.value =
     markerPos && Array.isArray(markerPos) && markerPos.length === 2 && markerPos[0] && markerPos[1]
 
@@ -201,7 +201,7 @@ async function handleSend() {
     isSubmitting.value = false
     return
   }
-
+  
   try {
     const payload = {
       plate_number: plateNumber.value,
@@ -212,8 +212,8 @@ async function handleSend() {
       date: reportDate.value,
       time: reportTime.value || null,
       description: description.value,
-      latitude_coordinate: markerPos[0],
-      longitude_coordinate: markerPos[1],
+      latitude_coordinate: markerValid.value ? markerPos[0] : null,
+      longitude_coordinate: markerValid.value ? markerPos[1] : null,
     }
 
     const res = await fetch(apiUrl('/api/v1/reports/create/'), {

@@ -42,6 +42,10 @@ async function validateUsername(val: string) {
     usernameError.value = 'שם המשתמש חייב להכיל לפחות 3 תווים 😕'
     return false
   }
+  if (val.trim().length > 150) {
+    usernameError.value = 'כל הכבוד על היצירתיות אבל שם המשתמש הזה ארוך מידי 😕'
+    return false
+  }
   try {
     const res = await fetch(
       apiUrl(`/api/v1/auth/check-username/?username=${encodeURIComponent(val.trim())}`),
@@ -200,6 +204,7 @@ async function handleSignup() {
           placeholder="לפחות 3 תווים"
           v-model="username"
           :class="{ 'invalid-field': !usernameValid }"
+          @keydown.enter="handleSignup"
         />
         <div v-if="!usernameValid" class="invalid-msg">{{ usernameError }}</div>
         <label for="signup-password" class="signup-label">סיסמא:</label>
@@ -211,6 +216,7 @@ async function handleSignup() {
             placeholder="לפחות 9 תווים הכוללים: מספר, אות קטנה ואות גדולה"
             v-model="password"
             :class="{ 'invalid-field': !passwordValid }"
+            @keydown.enter="handleSignup"
           />
           <button type="button" class="eye-btn" @click="showPassword = !showPassword" tabindex="-1">
             <svg
@@ -254,6 +260,7 @@ async function handleSignup() {
             v-model="confirmPassword"
             :class="{ 'invalid-field': !confirmPasswordValid }"
             @paste.prevent
+            @keydown.enter="handleSignup"
           />
           <button
             type="button"
