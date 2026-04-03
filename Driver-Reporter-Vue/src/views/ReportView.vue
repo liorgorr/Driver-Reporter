@@ -357,7 +357,7 @@ main {
 }
 
 .report-view h1 {
-  font-size: 5rem;
+  font-size: 5.11rem;
 }
 
 .report-view h1:first-of-type {
