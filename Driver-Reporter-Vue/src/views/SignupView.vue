@@ -2,9 +2,12 @@
 import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Navbar from '../components/Nav-bar.vue'
+import PasswordField from '../components/PasswordField.vue'
 import { useAuth } from '../stores/auth'
 import { getCsrfHeaders } from '../utils/csrf'
 import { apiUrl } from '../utils/api'
+import { usePasswordValidation } from '../composables/usePasswordValidation'
+import { useFormUi } from '../composables/useFormUi'
 
 const router = useRouter()
 
@@ -21,13 +24,17 @@ const passwordError = ref('')
 const confirmPasswordError = ref('')
 const serverError = ref('')
 
-const showPassword = ref(false)
-const showConfirmPassword = ref(false)
-
 const isSubmitting = ref(false)
 const hasAttemptedSubmit = ref(false)
 
 const { isLoggedIn, syncAuthStatus } = useAuth()
+const { validatePassword, validateConfirmPassword } = usePasswordValidation(
+  username,
+  password,
+  passwordError,
+  confirmPasswordError,
+)
+const { scrollToFirstInvalid, showServerError } = useFormUi()
 
 onMounted(async () => {
   await syncAuthStatus()
@@ -60,48 +67,6 @@ async function validateUsername(val: string) {
   return true
 }
 
-function validatePassword(val: string) {
-  if (!val) {
-    passwordError.value = 'זה אולי לא קל אבל חייבים לבחור סיסמא 😉'
-    return false
-  }
-  if (val.length < 9) {
-    passwordError.value = 'הסיסמא חייבת להכיל לפחות 9 תווים 😕'
-    return false
-  }
-  if (!/[0-9]/.test(val)) {
-    passwordError.value = 'הסיסמא חייבת להכיל לפחות מספר אחד 😕'
-    return false
-  }
-  if (!/[a-z]/.test(val)) {
-    passwordError.value = 'הסיסמא חייבת להכיל לפחות אות אחת קטנה באנגלית 😕'
-    return false
-  }
-  if (!/[A-Z]/.test(val)) {
-    passwordError.value = 'הסיסמא חייבת להכיל לפחות אות אחת גדולה באנגלית 😕'
-    return false
-  }
-  if (val.includes(username.value)) {
-    passwordError.value = 'אופס! הסיסמא לא יכולה להכיל את שם המשתמש 😕 גם אנחנו שונאים האקרים 😉'
-    return false
-  }
-  passwordError.value = ''
-  return true
-}
-
-function validateConfirm(val: string) {
-  if (!val && password.value) {
-    confirmPasswordError.value = 'זה אולי קצת מציק אבל חייבים לאשר את הסיסמא 😉'
-    return false
-  }
-  if (val !== password.value) {
-    confirmPasswordError.value = 'אופס! נראה שהסיסמאות לא תואמות 😕 אולי כדאי לבדוק שוב? 😉'
-    return false
-  }
-  confirmPasswordError.value = ''
-  return true
-}
-
 watch(username, async (val) => {
   if (hasAttemptedSubmit.value) {
     usernameValid.value = await validateUsername(val)
@@ -112,12 +77,14 @@ watch(username, async (val) => {
 watch(password, (val) => {
   if (hasAttemptedSubmit.value) {
     passwordValid.value = validatePassword(val)
-    if (confirmPassword.value) confirmPasswordValid.value = validateConfirm(confirmPassword.value)
+    if (confirmPassword.value) {
+      confirmPasswordValid.value = validateConfirmPassword(confirmPassword.value)
+    }
   }
 })
 
 watch(confirmPassword, (val) => {
-  if (hasAttemptedSubmit.value) confirmPasswordValid.value = validateConfirm(val)
+  if (hasAttemptedSubmit.value) confirmPasswordValid.value = validateConfirmPassword(val)
 })
 
 async function handleSignup() {
@@ -132,13 +99,10 @@ async function handleSignup() {
 
   usernameValid.value = await validateUsername(username.value)
   passwordValid.value = validatePassword(password.value)
-  confirmPasswordValid.value = validateConfirm(confirmPassword.value)
+  confirmPasswordValid.value = validateConfirmPassword(confirmPassword.value)
 
   if (!usernameValid.value || !passwordValid.value || !confirmPasswordValid.value) {
-    setTimeout(() => {
-      const firstInvalid = document.querySelector('.invalid-field, .invalid-msg')
-      if (firstInvalid) firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 50)
+    scrollToFirstInvalid()
     isSubmitting.value = false
     return
   }
@@ -153,6 +117,16 @@ async function handleSignup() {
       body: JSON.stringify({ username: username.value.trim(), password: password.value }),
     })
 
+    if (signupRes.status !== 201) {
+      const signupError = await signupRes.json()
+      showServerError(
+        serverError,
+        'אופס! נראה שהשרת שלנו איבד את הדרך עם נסיון ההרשמה שלך 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר',
+      )
+      console.error('Signup error:', signupError)
+      return
+    }
+
     const signinRes = await fetch(apiUrl('/api/v1/auth/login/'), {
       method: 'POST',
       credentials: 'include',
@@ -163,27 +137,23 @@ async function handleSignup() {
       }),
     })
 
-    if (signupRes.status === 201 && signinRes.ok) {
+    if (signinRes.ok) {
       await syncAuthStatus()
       await router.push('/')
     } else {
-      const data = (await signupRes.json()) + (await signinRes.json())
-      serverError.value =
-        'אופס! נראה שהשרת שלנו איבד את הדרך עם נסיון ההרשמה שלך 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר'
-      console.error('Signup error:', data)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-      setTimeout(() => {
-        serverError.value = ''
-      }, 15000)
+      const signinError = await signinRes.json()
+      showServerError(
+        serverError,
+        'אופס! נראה שהשרת שלנו איבד את הדרך עם נסיון ההתחברות שלך אחרי ההרשמה 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר',
+      )
+      console.error('Signin after signup error:', signinError)
     }
   } catch (err) {
-    serverError.value =
-      'אופס! נראה שהשרת שלנו יצא לשנ"צ 😴\nגם הטובים ביותר צריכים לנוח 😉\nנסו שוב או חזרו מאוחר יותר'
+    showServerError(
+      serverError,
+      'אופס! נראה שהשרת שלנו יצא לשנ"צ 😴\nגם הטובים ביותר צריכים לנוח 😉\nנסו שוב או חזרו מאוחר יותר',
+    )
     console.error('Network error:', err)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-    setTimeout(() => {
-      serverError.value = ''
-    }, 15000)
   } finally {
     isSubmitting.value = false
   }
@@ -208,97 +178,24 @@ async function handleSignup() {
         />
         <div v-if="!usernameValid" class="invalid-msg">{{ usernameError }}</div>
         <label for="signup-password" class="signup-label">סיסמא:</label>
-        <div class="password-wrapper">
-          <input
-            id="signup-password"
-            :type="showPassword ? 'text' : 'password'"
-            class="signup-input"
-            placeholder="לפחות 9 תווים הכוללים: מספר, אות קטנה ואות גדולה"
-            v-model="password"
-            :class="{ 'invalid-field': !passwordValid }"
-            @keydown.enter="handleSignup"
-          />
-          <button type="button" class="eye-btn" @click="showPassword = !showPassword" tabindex="-1">
-            <svg
-              v-if="!showPassword"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-            <svg
-              v-else
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
-              />
-              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-              <line x1="1" y1="1" x2="23" y2="23" />
-            </svg>
-          </button>
-        </div>
+        <PasswordField
+          id="signup-password"
+          v-model="password"
+          placeholder="לפחות 9 תווים הכוללים: מספר, אות קטנה ואות גדולה"
+          :invalid="!passwordValid"
+          marginBottom="0.5rem"
+          @enter="handleSignup"
+        />
         <div v-if="!passwordValid" class="invalid-msg">{{ passwordError }}</div>
         <label for="signup-confirm" class="signup-label">אותה סיסמא פעם נוספת:</label>
-        <div class="password-wrapper">
-          <input
-            id="signup-confirm"
-            :type="showConfirmPassword ? 'text' : 'password'"
-            class="signup-input"
-            v-model="confirmPassword"
-            :class="{ 'invalid-field': !confirmPasswordValid }"
-            @paste.prevent
-            @keydown.enter="handleSignup"
-          />
-          <button
-            type="button"
-            class="eye-btn"
-            @click="showConfirmPassword = !showConfirmPassword"
-            tabindex="-1"
-          >
-            <svg
-              v-if="!showConfirmPassword"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-            <svg
-              v-else
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
-              />
-              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-              <line x1="1" y1="1" x2="23" y2="23" />
-            </svg>
-          </button>
-        </div>
+        <PasswordField
+          id="signup-confirm"
+          v-model="confirmPassword"
+          :invalid="!confirmPasswordValid"
+          :preventPaste="true"
+          marginBottom="0.5rem"
+          @enter="handleSignup"
+        />
         <div v-if="!confirmPasswordValid" class="invalid-msg">{{ confirmPasswordError }}</div>
         <div v-if="serverError" class="error-message">{{ serverError }}</div>
         <button class="signup-btn" @click="handleSignup" :disabled="isSubmitting">הרשמה</button>
@@ -314,6 +211,8 @@ async function handleSignup() {
 </template>
 
 <style scoped>
+@import '../assets/form-feedback.css';
+
 main {
   grid-column: 1 / -1;
 }
@@ -323,6 +222,7 @@ main {
   min-width: 960px;
   min-height: calc(100vh - 7rem);
   padding: 7rem 2rem 2rem 2rem;
+  --invalid-msg-width: 50%;
 }
 
 .signup-view h1 {
@@ -344,42 +244,7 @@ main {
   align-items: center;
   gap: 0.5rem;
   direction: rtl;
-}
-
-.password-wrapper {
-  position: relative;
-  width: 50%;
-  margin-bottom: 0.5rem;
-}
-
-.password-wrapper .signup-input {
-  width: 100%;
-  margin-bottom: 0;
-  padding-left: 2.5rem;
-  box-sizing: border-box;
-}
-
-.eye-btn {
-  position: absolute;
-  left: 0.6rem;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  color: #888;
-  display: flex;
-  align-items: center;
-}
-
-.eye-btn:hover {
-  color: #333;
-}
-
-.eye-btn svg {
-  width: 20px;
-  height: 20px;
+  margin-top: 4rem;
 }
 
 .signup-input {
@@ -419,26 +284,6 @@ main {
   background-color: #157347;
 }
 
-.error-message {
-  position: fixed;
-  top: 80px;
-  right: 0;
-  left: 0;
-  margin: 0 auto;
-  z-index: 9999;
-  width: fit-content;
-  color: #d63333;
-  font-size: 1.3rem;
-  font-weight: bold;
-  background: #fdecea;
-  border-radius: 6px;
-  padding: 0.7rem 1.2rem;
-  border: 1px solid #d63333;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  text-align: center;
-  white-space: pre-line;
-}
-
 .signup-link {
   color: #aaa;
   font-size: 0.9rem;
@@ -453,17 +298,5 @@ main {
 
 .signup-link a:hover {
   text-decoration: underline;
-}
-
-.invalid-field {
-  border: 2px solid #d63333 !important;
-}
-
-.invalid-msg {
-  color: #d63333;
-  font-size: 1rem;
-  margin-top: -0.7rem;
-  text-align: right;
-  width: 50%;
 }
 </style>

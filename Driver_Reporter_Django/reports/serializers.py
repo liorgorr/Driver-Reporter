@@ -1,4 +1,5 @@
 import re
+from calendar import monthrange
 from datetime import datetime
 from rest_framework import serializers
 from django.utils import timezone
@@ -28,9 +29,8 @@ def _subtract_one_month(date_time):
         month = 12
         year -= 1
 
-    day = min(date_time.day, 28)
-    return date_time.replace(year=year, month=month, day=day)
-
+    day = min(date_time.day, monthrange(year, month)[1])
+    return date_time.replace(year=year, month=month, day=day, hour=0, minute=0, second=0, microsecond=0)
 
 def _reject_markup(value: str, field_name: str) -> str:
     if value and HTML_LIKE_PATTERN.search(value):
@@ -39,9 +39,12 @@ def _reject_markup(value: str, field_name: str) -> str:
         )
     return value
 
-
 class ReportSerializer(serializers.ModelSerializer):
     MAX_DESCRIPTION_LENGTH = 300
+    MIN_LATITUDE = 29.49
+    MAX_LATITUDE = 33.34
+    MIN_LONGITUDE = 34.266
+    MAX_LONGITUDE = 35.9
 
     class Meta:
         model = Report
@@ -92,6 +95,20 @@ class ReportSerializer(serializers.ModelSerializer):
         
         return value
 
+    def validate_latitude_coordinate(self, value):
+        if not self.MIN_LATITUDE <= value <= self.MAX_LATITUDE:
+            raise serializers.ValidationError(
+                f'latitude_coordinate must be between {self.MIN_LATITUDE} and {self.MAX_LATITUDE}.'
+            )
+        return value
+
+    def validate_longitude_coordinate(self, value):
+        if not self.MIN_LONGITUDE <= value <= self.MAX_LONGITUDE:
+            raise serializers.ValidationError(
+                f'longitude_coordinate must be between {self.MIN_LONGITUDE} and {self.MAX_LONGITUDE}.'
+            )
+        return value
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
 
@@ -111,25 +128,16 @@ class ReportSerializer(serializers.ModelSerializer):
             date_time = datetime.combine(report_date, report_time or datetime.min.time())
             current_timezone = timezone.get_current_timezone()
             report_date_time = timezone.make_aware(date_time, current_timezone)
-            now = timezone.now()
+            now = timezone.localtime(timezone.now(), current_timezone)
 
             if report_date_time > now:
                 raise serializers.ValidationError({'date': ['date/time cannot be in the future.']})
 
             one_month_ago = _subtract_one_month(now)
+            
             if report_date_time < one_month_ago:
                 raise serializers.ValidationError(
                     {'date': ['date/time cannot be older than one month.']}
                 )
-
-        user = self.context.get('authenticated_user')
-        plate_number = attrs.get('plate_number', '')
-        if user is not None and plate_number and Report.objects.filter(
-            user_name=user.username,
-            plate_number=plate_number,
-        ).exists():
-            raise serializers.ValidationError(
-                {'plate_number': ['You already reported this plate number.']}
-            )
 
         return attrs

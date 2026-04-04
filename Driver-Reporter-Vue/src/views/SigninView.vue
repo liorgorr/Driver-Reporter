@@ -2,9 +2,11 @@
 import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Navbar from '../components/Nav-bar.vue'
+import PasswordField from '../components/PasswordField.vue'
 import { useAuth } from '../stores/auth'
 import { getCsrfHeaders } from '../utils/csrf'
 import { apiUrl } from '../utils/api'
+import { useFormUi } from '../composables/useFormUi'
 
 const router = useRouter()
 
@@ -19,16 +21,15 @@ const passwordError = ref('')
 const wrongInputError = ref('')
 const serverError = ref('')
 
-const showPassword = ref(false)
-
 const isSubmitting = ref(false)
 const hasAttemptedSubmit = ref(false)
 
 const { isLoggedIn, syncAuthStatus } = useAuth()
+const { scrollToFirstInvalid, showServerError } = useFormUi()
 
 onMounted(async () => {
   await syncAuthStatus()
-  })
+})
 
 function validateUsername(val: string) {
   if (!val) {
@@ -46,7 +47,7 @@ function validatePassword(val: string) {
   return true
 }
 
-watch(username, async (val) => {
+watch(username, (val) => {
   if (hasAttemptedSubmit.value) usernameValid.value = validateUsername(val)
   wrongInputError.value = ''
 })
@@ -70,10 +71,7 @@ async function handleSignin() {
   passwordValid.value = validatePassword(password.value)
 
   if (!usernameValid.value || !passwordValid.value) {
-    setTimeout(() => {
-      const firstInvalid = document.querySelector('.invalid-field, .invalid-msg')
-      if (firstInvalid) firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 50)
+    scrollToFirstInvalid()
     isSubmitting.value = false
     return
   }
@@ -102,23 +100,19 @@ async function handleSignin() {
         wrongInputError.value = 'אופס! נראה שלא הצלחת להתחבר יותר מידי פעמים, נסו שוב בעוד דקה 😕'
       } else {
         const data = await res.json()
-        serverError.value =
-          'אופס! נראה שהשרת שלנו איבד את הדרך עם נסיון ההתחברות שלך 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר'
+        showServerError(
+          serverError,
+          'אופס! נראה שהשרת שלנו איבד את הדרך עם נסיון ההתחברות שלך 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר',
+        )
         console.error('Signin error:', data)
-        window.scrollTo({ top: 0, behavior: 'smooth' })
-        setTimeout(() => {
-          serverError.value = ''
-        }, 15000)
       }
     }
   } catch (err) {
-    serverError.value =
-      'אופס! נראה שהשרת שלנו יצא לשנ"צ 😴\nגם הטובים ביותר צריכים לנוח 😉\nנסו שוב או חזרו מאוחר יותר'
+    showServerError(
+      serverError,
+      'אופס! נראה שהשרת שלנו יצא לשנ"צ 😴\nגם הטובים ביותר צריכים לנוח 😉\nנסו שוב או חזרו מאוחר יותר',
+    )
     console.error('Network error:', err)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-    setTimeout(() => {
-      serverError.value = ''
-    }, 15000)
   } finally {
     isSubmitting.value = false
   }
@@ -143,47 +137,12 @@ async function handleSignin() {
         <div v-if="!usernameValid" class="invalid-msg">{{ usernameError }}</div>
 
         <label for="signin-password" class="signin-label">סיסמא:</label>
-        <div class="password-wrapper">
-          <input
-            id="signin-password"
-            v-model="password"
-            :type="showPassword ? 'text' : 'password'"
-            class="signin-input"
-            :class="{ 'invalid-field': !passwordValid }"
-            @keydown.enter="handleSignin"
-          />
-          <button type="button" class="eye-btn" @click="showPassword = !showPassword" tabindex="-1">
-            <svg
-              v-if="!showPassword"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-            <svg
-              v-else
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
-              />
-              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-              <line x1="1" y1="1" x2="23" y2="23" />
-            </svg>
-          </button>
-        </div>
+        <PasswordField
+          id="signin-password"
+          v-model="password"
+          :invalid="!passwordValid"
+          @enter="handleSignin"
+        />
         <div v-if="!passwordValid" class="invalid-msg">{{ passwordError }}</div>
         <div v-if="wrongInputError" class="invalid-msg">{{ wrongInputError }}</div>
         <div v-if="serverError" class="error-message">{{ serverError }}</div>
@@ -202,6 +161,8 @@ async function handleSignin() {
 </template>
 
 <style scoped>
+@import '../assets/form-feedback.css';
+
 main {
   grid-column: 1 / -1;
 }
@@ -211,6 +172,7 @@ main {
   min-width: 960px;
   min-height: calc(100vh - 7rem);
   padding: 7rem 2rem 2rem 2rem;
+  --invalid-msg-width: 50%;
 }
 
 .signin-view h1 {
@@ -232,42 +194,7 @@ main {
   align-items: center;
   gap: 0.5rem;
   direction: rtl;
-}
-
-.password-wrapper {
-  position: relative;
-  width: 50%;
-  margin-bottom: 1rem;
-}
-
-.password-wrapper .signin-input {
-  width: 100%;
-  margin-bottom: 0;
-  padding-left: 2.5rem;
-  box-sizing: border-box;
-}
-
-.eye-btn {
-  position: absolute;
-  left: 0.6rem;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  color: #888;
-  display: flex;
-  align-items: center;
-}
-
-.eye-btn:hover {
-  color: #333;
-}
-
-.eye-btn svg {
-  width: 20px;
-  height: 20px;
+  margin-top: 4rem;
 }
 
 .signin-input {
@@ -307,26 +234,6 @@ main {
   background-color: #157347;
 }
 
-.error-message {
-  position: fixed;
-  top: 80px;
-  right: 0;
-  left: 0;
-  margin: 0 auto;
-  z-index: 9999;
-  width: fit-content;
-  color: #d63333;
-  font-size: 1.3rem;
-  font-weight: bold;
-  background: #fdecea;
-  border-radius: 6px;
-  padding: 0.7rem 1.2rem;
-  border: 1px solid #d63333;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  text-align: center;
-  white-space: pre-line;
-}
-
 .signup-link {
   color: #aaa;
   font-size: 0.9rem;
@@ -341,17 +248,5 @@ main {
 
 .signup-link a:hover {
   text-decoration: underline;
-}
-
-.invalid-field {
-  border: 2px solid #d63333 !important;
-}
-
-.invalid-msg {
-  color: #d63333;
-  font-size: 1rem;
-  margin-top: -0.7rem;
-  text-align: right;
-  width: 50%;
 }
 </style>

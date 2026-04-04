@@ -236,6 +236,23 @@ watch(
   },
 )
 
+onBeforeUnmount(() => {
+  displayMarkers.forEach((m) => m.remove())
+  displayMarkers.length = 0
+
+  if (marker) {
+    marker.off()
+    marker.remove()
+    marker = null
+  }
+
+  if (map) {
+    map.off()
+    map.remove()
+    map = null
+  }
+})
+
 defineExpose({ markerPosition })
 </script>
 

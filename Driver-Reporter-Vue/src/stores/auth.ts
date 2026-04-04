@@ -3,36 +3,38 @@ import { apiUrl } from '../utils/api'
 
 const isLoggedIn = ref<boolean>(false)
 const username = ref<string>('')
-const isSyncingAuth = ref<boolean>(false)
+let authSyncPromise: Promise<void> | null = null
 
-async function syncAuthStatus() {
-  if (isSyncingAuth.value) {
-    return
+function syncAuthStatus(): Promise<void> {
+  if (authSyncPromise) {
+    return authSyncPromise
   }
 
-  isSyncingAuth.value = true
+  authSyncPromise = (async () => {
+    try {
+      const res = await fetch(apiUrl('/api/v1/auth/status/'), {
+        credentials: 'include',
+      })
 
-  try {
-    const res = await fetch(apiUrl('/api/v1/auth/status/'), {
-      credentials: 'include',
-    })
+      if (!res.ok) {
+        isLoggedIn.value = false
+        username.value = ''
+        return
+      }
 
-    if (!res.ok) {
+      const data = (await res.json()) as { authenticated?: boolean; username?: string }
+      isLoggedIn.value = data.authenticated === true
+      username.value = data.authenticated === true ? (data.username ?? '') : ''
+    } catch (err) {
+      console.error('Auth status sync failed:', err)
       isLoggedIn.value = false
       username.value = ''
-      return
+    } finally {
+      authSyncPromise = null
     }
+  })()
 
-    const data = (await res.json()) as { authenticated?: boolean; username?: string }
-    isLoggedIn.value = data.authenticated === true
-    username.value = data.authenticated === true ? (data.username ?? '') : ''
-  } catch (err) {
-    console.error('Auth status sync failed:', err)
-    isLoggedIn.value = false
-    username.value = ''
-  } finally {
-    isSyncingAuth.value = false
-  }
+  return authSyncPromise
 }
 
 export function useAuth() {

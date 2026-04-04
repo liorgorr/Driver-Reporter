@@ -7,6 +7,31 @@ import { ref as vueRef } from 'vue'
 import { useAuth } from '../stores/auth'
 import { getCsrfHeaders } from '../utils/csrf'
 import { apiUrl } from '../utils/api'
+import { useFormUi } from '../composables/useFormUi'
+
+const plateNumber = ref('')
+const selectedOffenseType = ref('')
+const ISRAEL_TIME_ZONE = 'Asia/Jerusalem'
+const reportDate = ref('')
+const reportTime = ref('')
+const MAX_DESC = 300
+const description = ref('')
+const mapRef = vueRef()
+const checked = ref(false)
+
+const markerValid = ref(true)
+const plateNumberValid = ref(true)
+const offenseTypeValid = ref(true)
+const dateValid = ref(true)
+const descriptionValid = ref(true)
+const checkedValid = ref(true)
+
+const dateErrorMsg = ref('')
+const markerErrorMsg = ref('')
+const serverError = ref('')
+const showSuccess = ref(false)
+const isSubmitting = ref(false)
+const hasAttemptedSubmit = ref(false)
 
 const offenseTypes = ref([
   { value: 'red_light', text: 'רמזור אדום', icon: '🚦' },
@@ -19,28 +44,23 @@ const offenseTypes = ref([
   { value: 'other', text: 'אחר', icon: '💬' },
 ])
 
-const plateNumber = ref('')
-const selectedOffenseType = ref('')
-const reportDate = ref('')
-const reportTime = ref('')
-const description = ref('')
-const checked = ref(false)
+type DateTimeParts = {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+}
 
-const MAX_DESC = 300
-const mapRef = vueRef()
-
-const markerValid = ref(true)
-const plateNumberValid = ref(true)
-const offenseTypeValid = ref(true)
-const dateValid = ref(true)
-const descriptionValid = ref(true)
-const checkedValid = ref(true)
-
-const dateErrorMsg = ref('')
-const serverError = ref('')
-const showSuccess = ref(false)
-const isSubmitting = ref(false)
-const hasAttemptedSubmit = ref(false)
+const israelDateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: ISRAEL_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
 
 const { isLoggedIn, syncAuthStatus } = useAuth()
 
@@ -76,34 +96,141 @@ async function validatePlateNumber(plateNumber: string) {
   }
 }
 
+function getNowInIsrael(): DateTimeParts {
+  const parts = israelDateTimeFormatter.formatToParts(new Date())
+  const readPart = (type: Intl.DateTimeFormatPartTypes): number => {
+    const raw = parts.find((part) => part.type === type)?.value
+    return raw ? Number(raw) : 0
+  }
+
+  return {
+    year: readPart('year'),
+    month: readPart('month'),
+    day: readPart('day'),
+    hour: readPart('hour'),
+    minute: readPart('minute'),
+  }
+}
+
+function getTodayInIsrael(): string {
+  const now = getNowInIsrael()
+  return `${now.year}-${String(now.month).padStart(2, '0')}-${String(now.day).padStart(2, '0')}`
+}
+
+const maxReportDate = ref(getTodayInIsrael())
+const { scrollToFirstInvalid, showServerError } = useFormUi()
+
+function getDaysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate()
+}
+
+function subtractOneMonth(dateTime: DateTimeParts): DateTimeParts {
+  let year = dateTime.year
+  let month = dateTime.month - 1
+  if (month === 0) {
+    month = 12
+    year -= 1
+  }
+
+  const day = Math.min(dateTime.day, getDaysInMonth(year, month))
+  return {
+    year,
+    month,
+    day,
+    hour: 0,
+    minute: 0,
+  }
+}
+
+function parseSelectedDateTime(date: string, time: string): DateTimeParts | null {
+  const dateMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!dateMatch) {
+    return null
+  }
+
+  const year = Number(dateMatch[1])
+  const month = Number(dateMatch[2])
+  const day = Number(dateMatch[3])
+  if (month < 1 || month > 12) {
+    return null
+  }
+
+  if (day < 1 || day > getDaysInMonth(year, month)) {
+    return null
+  }
+
+  let hour = 0
+  let minute = 0
+  if (time) {
+    const timeMatch = time.match(/^(\d{2}):(\d{2})$/)
+    if (!timeMatch) {
+      return null
+    }
+
+    hour = Number(timeMatch[1])
+    minute = Number(timeMatch[2])
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+      return null
+    }
+  }
+
+  return { year, month, day, hour, minute }
+}
+
+function compareDateTime(left: DateTimeParts, right: DateTimeParts): number {
+  if (left.year !== right.year) return left.year < right.year ? -1 : 1
+  if (left.month !== right.month) return left.month < right.month ? -1 : 1
+  if (left.day !== right.day) return left.day < right.day ? -1 : 1
+  if (left.hour !== right.hour) return left.hour < right.hour ? -1 : 1
+  if (left.minute !== right.minute) return left.minute < right.minute ? -1 : 1
+  return 0
+}
+
 function validateDateTime(date: string, time: string) {
-  if (!date || date.split('-').length !== 3) {
+  const selectedDateTime = parseSelectedDateTime(date, time)
+
+  if (!date || date.split('-').length !== 3 || !selectedDateTime) {
+    dateErrorMsg.value = 'אופס! נראה שלא בחרת תאריך תקין'
     return false
   }
 
-  let selectedDateTime: Date
-  if (time) {
-    selectedDateTime = new Date(`${date}T${time}`)
-  } else {
-    selectedDateTime = new Date(`${date}T00:00:00`)
-  }
+  const nowInIsrael = getNowInIsrael()
 
-  const now = new Date()
-
-  if (selectedDateTime > now) {
+  if (compareDateTime(selectedDateTime, nowInIsrael) > 0) {
     dateErrorMsg.value = 'מזל טוב! נראה שבנית מכונת זמן כי הזמן או התאריך שבחרת עוד לא הגיעו'
     return false
   }
 
-  const oneMonthAgo = new Date()
-  oneMonthAgo.setMonth(now.getMonth() - 1)
+  const oneMonthAgo = subtractOneMonth(nowInIsrael)
 
-  if (selectedDateTime < oneMonthAgo) {
+  if (compareDateTime(selectedDateTime, oneMonthAgo) < 0) {
     dateErrorMsg.value = 'אופס! לא ניתן למלא דיווח על אירוע שקרה יותר מלפני חודש'
     return false
   }
 
   dateErrorMsg.value = ''
+  return true
+}
+
+function validateMarker(markerPos: [number, number] | null) {
+  if (
+    !markerPos ||
+    !Array.isArray(markerPos) ||
+    markerPos.length !== 2 ||
+    !markerPos[0] ||
+    !markerPos[1]
+  ) {
+    markerErrorMsg.value = 'יש לסמן את מקום האירוע במפה'
+    return false
+  } else if (
+    markerPos[0] < 29.49 ||
+    markerPos[0] > 33.34 ||
+    markerPos[1] < 34.266 ||
+    markerPos[1] > 35.9
+  ) {
+    markerErrorMsg.value = 'אופס! נראה שהמיקום שסימנת לא נמצא בישראל'
+    return false
+  }
   return true
 }
 
@@ -144,27 +271,13 @@ watch(checked, (newVal) => {
 watch(
   () => mapRef.value?.markerPosition,
   (newPos) => {
-    if (
-      hasAttemptedSubmit.value &&
-      newPos &&
-      Array.isArray(newPos) &&
-      newPos.length === 2 &&
-      newPos[0] &&
-      newPos[1]
-    ) {
-      markerValid.value = true
+    if (hasAttemptedSubmit.value) {
+      markerValid.value = validateMarker(newPos as [number, number] | null)
     }
   },
-  { deep: true },
 )
 
 async function handleSend() {
-  await syncAuthStatus()
-
-  if (!isLoggedIn.value) {
-    return
-  }
-
   hasAttemptedSubmit.value = true
   serverError.value = ''
   isSubmitting.value = true
@@ -177,10 +290,9 @@ async function handleSend() {
   } else {
     descriptionValid.value = true
   }
-  checkedValid.value = !!checked.value
   const markerPos = mapRef.value?.markerPosition
-  markerValid.value =
-    markerPos && Array.isArray(markerPos) && markerPos.length === 2 && markerPos[0] && markerPos[1]
+  markerValid.value = validateMarker(markerPos as [number, number] | null)
+  checkedValid.value = !!checked.value
 
   if (
     !plateNumberValid.value ||
@@ -190,18 +302,11 @@ async function handleSend() {
     !checkedValid.value ||
     !markerValid.value
   ) {
-    setTimeout(() => {
-      const firstInvalid = document.querySelector(
-        '.invalid-field, .invalid-msg, .invalid-plate-label',
-      )
-      if (firstInvalid) {
-        firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }
-    }, 50)
+    scrollToFirstInvalid('.invalid-field, .invalid-msg, .invalid-plate-label')
     isSubmitting.value = false
     return
   }
-  
+
   try {
     const payload = {
       plate_number: plateNumber.value,
@@ -230,22 +335,22 @@ async function handleSend() {
       }, 2000)
     } else {
       const data = await res.json()
-      serverError.value =
-        'אופס! נראה שהשרת שלנו איבד את הדרך עם הדיווח שלך 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר'
+      if (res.status === 401) {
+        showServerError(serverError, 'אופס! נראה שאינך מחובר/ת 😕')
+      } else {
+        showServerError(
+          serverError,
+          'אופס! נראה שהשרת שלנו איבד את הדרך עם הדיווח שלך 😕\nקורה גם לטובים ביותר 😉\nנסו שוב או חזרו מאוחר יותר',
+        )
+      }
       console.error('Report submission error:', data)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-      setTimeout(() => {
-        serverError.value = ''
-      }, 15000)
     }
   } catch (err) {
-    serverError.value =
-      'אופס! נראה שהשרת שלנו יצא לשנ"צ 😴\nגם הטובים ביותר צריכים לנוח 😉\nנסו שוב או חזרו מאוחר יותר'
+    showServerError(
+      serverError,
+      'אופס! נראה שהשרת שלנו יצא לשנ"צ 😴\nגם הטובים ביותר צריכים לנוח 😉\nנסו שוב או חזרו מאוחר יותר',
+    )
     console.error('Network error:', err)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-    setTimeout(() => {
-      serverError.value = ''
-    }, 15000)
   } finally {
     isSubmitting.value = false
   }
@@ -281,7 +386,7 @@ async function handleSend() {
             id="report-date"
             type="date"
             v-model="reportDate"
-            :max="new Date().toISOString().split('T')[0]"
+            :max="maxReportDate"
             :class="{ 'invalid-field': !dateValid }"
           />
         </div>
@@ -315,7 +420,7 @@ async function handleSend() {
       <div class="map-panel">
         <label for="map">סמנו את מקום האירוע בדיוק איפה שהוא קרה:</label>
         <Map :allowMarker="true" id="map" ref="mapRef" />
-        <div v-if="!markerValid" class="invalid-msg">יש לסמן את מקום האירוע במפה</div>
+        <div v-if="!markerValid" class="invalid-msg">{{ markerErrorMsg }}</div>
       </div>
       <div class="checkbox-row">
         <span class="checkbox-wrapper" :class="{ 'invalid-field': !checkedValid }">
@@ -338,6 +443,8 @@ async function handleSend() {
 </template>
 
 <style scoped>
+@import '../assets/form-feedback.css';
+
 main {
   grid-column: 1 / -1;
   display: flex;
@@ -354,6 +461,8 @@ main {
   gap: 1rem;
   padding: 7rem 2rem 2rem 2rem;
   min-width: 960px;
+  --invalid-msg-width: auto;
+  --invalid-msg-margin-top: 0.5rem;
 }
 
 .report-view h1 {
@@ -491,49 +600,6 @@ main {
   opacity: 0.7;
 }
 
-.success-message {
-  position: fixed;
-  top: 80px;
-  right: 0;
-  left: 0;
-  margin: 0 auto;
-  z-index: 9999;
-  width: fit-content;
-  color: #189359;
-  font-size: 1.3rem;
-  font-weight: bold;
-  background: #e6f9ed;
-  border-radius: 6px;
-  padding: 0.7rem 1.2rem;
-  border: 1px solid #189359;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  text-align: center;
-}
-
-.error-message {
-  position: fixed;
-  top: 80px;
-  right: 0;
-  left: 0;
-  margin: 0 auto;
-  z-index: 9999;
-  width: fit-content;
-  color: #d63333;
-  font-size: 1.3rem;
-  font-weight: bold;
-  background: #fdecea;
-  border-radius: 6px;
-  padding: 0.7rem 1.2rem;
-  border: 1px solid #d63333;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  text-align: center;
-  white-space: pre-line;
-}
-
-.invalid-field {
-  border: 2px solid #d63333 !important;
-}
-
 .checkbox-wrapper {
   display: inline-flex;
   align-items: center;
@@ -548,13 +614,6 @@ main {
   width: 18px;
   height: 18px;
   vertical-align: middle;
-}
-
-.invalid-msg {
-  color: #d63333;
-  font-size: 1rem;
-  margin-top: 0.5rem;
-  text-align: right;
 }
 
 .date-error-msg {

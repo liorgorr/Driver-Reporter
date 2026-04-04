@@ -196,15 +196,14 @@ class PasswordChangeView(APIView):
         if csrf_failure is not None:
             return csrf_failure
 
-        token = _get_valid_token_from_cookie(request)
-        if token is None:
-            return Response({'detail': 'Invalid or expired auth token.'}, status=status.HTTP_401_UNAUTHORIZED)
+        user = _get_authenticated_user_from_cookie(request)
+        if user is None:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
 
         new_password = (request.data.get('password') or '')
         if not new_password:
             return Response({'detail': 'Password is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        user = token.user
         try:
             validate_password(new_password, user=user)
         except DjangoValidationError as exc:
@@ -246,7 +245,13 @@ class ReportCreateView(APIView):
             context={'authenticated_user': user},
         )
         if serializer.is_valid():
-            serializer.save(user_name=user.username)
+            try:
+                serializer.save(user_name=user.username)
+            except IntegrityError:
+                return Response(
+                    {'plate_number': ['You already reported this plate number.']},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -273,6 +278,8 @@ class MaxReportedPlateView(APIView):
     """
     def get(self, request):
         max_reported = Report.objects.exclude(plate_number='').values('plate_number').annotate(count=Count('plate_number')).order_by('-count').first()
+        if max_reported is None:
+            max_reported = {'plate_number': '', 'count': 0}
         return Response({'maxReported': max_reported})
 
 class ReportsByPlateView(APIView):
@@ -298,6 +305,8 @@ class MaxReportedTypeView(APIView):
     """
     def get(self, request):
         max_reported = Report.objects.exclude(offense_type='💬 אחר').values('offense_type').annotate(count=Count('offense_type')).order_by('-count').first()
+        if max_reported is None:
+            max_reported = {'offense_type': '', 'count': 0}
         return Response({'maxReported': max_reported})
 
 

@@ -16,3 +16,10 @@ class Report(models.Model):
 
     class Meta:
         db_table = 'report'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user_name', 'plate_number'],
+                condition=~models.Q(plate_number=''),
+                name='uniq_report_user_plate_non_empty',
+            ),
+        ]
