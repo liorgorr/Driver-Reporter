@@ -8,14 +8,14 @@ import ReportBox from '../components/ReportBox.vue'
 import { apiUrl } from '../utils/api'
 
 const activePanel = ref<'none' | 'search' | 'map'>('none')
-const distinctPlateCount = ref<number>(0)
+const reportCount = ref<number>(0)
 
 function animateCount(target: number, duration = 2000) {
   const start = performance.now()
   const step = (now: number) => {
     const progress = Math.min((now - start) / duration, 1)
     const eased = 1 - Math.pow(1 - progress, 3)
-    distinctPlateCount.value = Math.round(eased * target)
+    reportCount.value = Math.round(eased * target)
     if (progress < 1) requestAnimationFrame(step)
   }
   requestAnimationFrame(step)
@@ -23,13 +23,13 @@ function animateCount(target: number, duration = 2000) {
 
 onMounted(async () => {
   try {
-    const res = await fetch(apiUrl('/api/v1/reports/distinct-plate-count/'))
+    const res = await fetch(apiUrl('/api/v1/reports/count/'))
     if (res.ok) {
       const data = await res.json()
       animateCount(data.count)
     }
   } catch (err) {
-    console.error('Failed to fetch distinct plate count:', err)
+    console.error('Failed to fetch report count:', err)
   }
 })
 
@@ -37,7 +37,7 @@ const plateNumber = ref('')
 const plateInputRef = ref<InstanceType<typeof PlateNumberInput> | null>(null)
 const defaultColor = { value: 'yellow', text: 'לוחית צהובה (רגילה)' }
 const selectedColor = ref(defaultColor)
-const reportCount = ref(0)
+const plateReportCount = ref(0)
 
 interface Report {
   id: number
@@ -49,6 +49,7 @@ interface Report {
   latitude_coordinate: number
   longitude_coordinate: number
 }
+
 const reports = ref<Report[]>([])
 
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -59,7 +60,7 @@ watch(plateNumber, (newVal) => {
   if (searchAbortController) searchAbortController.abort()
 
   if (!newVal) {
-    reportCount.value = 0
+    plateReportCount.value = 0
     reports.value = []
     return
   }
@@ -69,13 +70,12 @@ watch(plateNumber, (newVal) => {
     const { signal } = searchAbortController
 
     try {
-      const res = await fetch(
-        apiUrl(`/api/v1/reports/plates/${encodeURIComponent(newVal)}/`),
-        { signal },
-      )
+      const res = await fetch(apiUrl(`/api/v1/reports/plates/${encodeURIComponent(newVal)}/`), {
+        signal,
+      })
       if (res.ok) {
         const data = await res.json()
-        reportCount.value = data.count
+        plateReportCount.value = data.count
         reports.value = data.reports
       }
     } catch (err) {
@@ -135,7 +135,7 @@ async function fetchAllReports() {
 function togglePanels(panel: 'search' | 'map') {
   if (panel === 'search') {
     plateNumber.value = ''
-    reportCount.value = 0
+    plateReportCount.value = 0
     reports.value = []
     selectedColor.value = defaultColor
     plateInputRef.value?.reset()
@@ -153,8 +153,8 @@ onMounted(() => {
     <Navbar />
     <section class="home-view" dir="rtl">
       <h1>
-        {{ distinctPlateCount }} <br />
-        רכבים כבר דווחו
+        {{ reportCount }} <br />
+        דיווחים כבר התקבלו
       </h1>
       <div class="home-actions">
         <button
@@ -183,14 +183,14 @@ onMounted(() => {
               @update:plateNumber="plateNumber = $event"
               @update:selectedColor="selectedColor = $event"
             />
-            <label v-if="plateNumber && reportCount > 0" class="search-results-label"
-              >{{ reportCount }} דיווחים נמצאו עבור המספר:</label
+            <label v-if="plateNumber && plateReportCount > 0" class="search-results-label"
+              >{{ plateReportCount }} דיווחים נמצאו עבור המספר:</label
             >
-            <label v-if="plateNumber && reportCount === 0" class="no-results-label"
+            <label v-if="plateNumber && plateReportCount === 0" class="no-results-label"
               >לא נמצאו דיווחים עבור המספר הזה (בינתיים 😉)</label
             >
             <div
-              v-if="plateNumber && reportCount > 0"
+              v-if="plateNumber && plateReportCount > 0"
               class="plate-preview"
               :style="platePreviewStyle"
             >
@@ -198,7 +198,7 @@ onMounted(() => {
             </div>
           </div>
 
-          <div v-if="plateNumber && reportCount > 0" class="report-list">
+          <div v-if="plateNumber && plateReportCount > 0" class="report-list">
             <ReportBox
               v-for="report in reports"
               :reportId="report.id"

@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -13,6 +14,7 @@ from django.middleware.csrf import CsrfViewMiddleware, get_token
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework.authtoken.models import Token
+from urllib3 import request
 from .models import Report
 from .serializers import ReportSerializer
 from .throttles import LoginRateThrottle
@@ -40,7 +42,6 @@ def _get_authenticated_user_from_cookie(request):
     if token is None:
         return None
     return token.user
-
 
 def _enforce_csrf(request):
     failure = CsrfViewMiddleware(lambda req: None).process_view(
@@ -103,18 +104,19 @@ class AuthSignupView(APIView):
         except DjangoValidationError as exc:
             return Response({'username': list(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
 
-        if User.objects.filter(username=username).exists():
+        try:
+            validate_password(password, user=User(username=username))
+        except DjangoValidationError as exc:
+            return Response({'password': list(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            User.objects.create_user(username=username, password=password)
+        except IntegrityError:
             return Response(
                 {'username': ['A user with that username already exists.']},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        try:
-            validate_password(password, user=User(username=username))
-        except DjangoValidationError as exc:
-            return Response({'password': list(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
-     
-        User.objects.create_user(username=username, password=password)
         return Response({'detail': 'User created successfully.'}, status=status.HTTP_201_CREATED)
 
 
@@ -255,7 +257,6 @@ class ReportCreateView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 class DistinctPlateCountView(APIView):
     """
     GET /api/v1/reports/distinct-plate-count/ — number of distinct non-empty plate numbers
@@ -277,24 +278,27 @@ class MaxReportedPlateView(APIView):
     GET /api/v1/reports/max-reported-plate/ — the most reported plate number (excluding empty plate numbers) and the count of its reports
     """
     def get(self, request):
-        max_reported = Report.objects.exclude(plate_number='').values('plate_number').annotate(count=Count('plate_number')).order_by('-count').first()
-        if max_reported is None:
-            max_reported = {'plate_number': '', 'count': 0}
-        return Response({'maxReported': max_reported})
-
+        result = cache.get('max_reported_plate')
+        if result is None:
+            result = Report.objects.exclude(plate_number='').values('plate_number').annotate(count=Count('plate_number')).order_by('-count').first()
+            if result is None:
+                result = {'plate_number': '', 'count': 0}
+            cache.set('max_reported_plate', result, timeout=3600)  # 1 hour cache
+        return Response({'maxReported': result})
+        
 class ReportsByPlateView(APIView):
     """
     GET /api/v1/reports/plates/{plate_number}/ — all reports for a given plate number (excluding empty plate numbers) and the count of those reports
     """
     def get(self, request, plate_number):
-        reports = Report.objects.exclude(plate_number='').filter(plate_number=plate_number)
+        reports_list = list(Report.objects.exclude(plate_number='').filter(plate_number=plate_number))
         user = _get_authenticated_user_from_cookie(request)
         reported_by_current_user = False
         if user is not None:
-            reported_by_current_user = reports.filter(user_name=user.username).exists()
-        serializer = ReportSerializer(reports, many=True)
+            reported_by_current_user = any(r.user_name == user.username for r in reports_list)
+        serializer = ReportSerializer(reports_list, many=True)
         return Response({
-            'count': reports.count(),
+            'count': len(reports_list),
             'reported_by_current_user': reported_by_current_user,
             'reports': serializer.data,
         })
@@ -304,11 +308,13 @@ class MaxReportedTypeView(APIView):
     GET /api/v1/reports/max-reported-type/ — the most reported offense type (excluding other) and the count of its reports
     """
     def get(self, request):
-        max_reported = Report.objects.exclude(offense_type='💬 אחר').values('offense_type').annotate(count=Count('offense_type')).order_by('-count').first()
-        if max_reported is None:
-            max_reported = {'offense_type': '', 'count': 0}
-        return Response({'maxReported': max_reported})
-
+        result = cache.get('max_reported_type')
+        if result is None:
+            result = Report.objects.exclude(offense_type='💬 אחר').values('offense_type').annotate(count=Count('offense_type')).order_by('-count').first()
+            if result is None:
+                result = {'offense_type': '', 'count': 0}
+            cache.set('max_reported_type', result, timeout=3600)  # 1 hour cache
+        return Response({'maxReported': result})
 
 class AllReportsView(APIView):
     """
@@ -328,6 +334,6 @@ class CurrentUserReportsView(APIView):
         if user is None:
             return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        reports = Report.objects.filter(user_name=user.username)
-        serializer = ReportSerializer(reports, many=True)
-        return Response({'count': reports.count(), 'reports': serializer.data})
+        reports_list = list(Report.objects.filter(user_name=user.username))
+        serializer = ReportSerializer(reports_list, many=True)
+        return Response({'count': len(reports_list), 'reports': serializer.data})
