@@ -23,7 +23,11 @@ export async function ensureCsrfCookie(): Promise<void> {
       method: 'GET',
       credentials: 'include',
     })
-      .then(() => undefined)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`CSRF init failed: ${res.status}`)
+        }
+      })
       .finally(() => {
         csrfInitPromise = null
       })
@@ -40,6 +44,8 @@ export async function getCsrfHeaders(baseHeaders: HeadersInit = {}): Promise<Hea
 
   if (token) {
     headers.set('X-CSRFToken', token)
+  } else {
+    throw new Error('CSRF token unavailable after initialization')
   }
 
   return headers

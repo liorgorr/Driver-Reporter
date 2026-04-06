@@ -283,7 +283,7 @@ class MaxReportedPlateView(APIView):
             result = Report.objects.exclude(plate_number='').values('plate_number').annotate(count=Count('plate_number')).order_by('-count').first()
             if result is None:
                 result = {'plate_number': '', 'count': 0}
-            cache.set('max_reported_plate', result, timeout=3600)  # 1 hour cache
+            cache.set('max_reported_plate', result, timeout=300)  # 5 minutes cache
         return Response({'maxReported': result})
         
 class ReportsByPlateView(APIView):
@@ -292,16 +292,25 @@ class ReportsByPlateView(APIView):
     """
     def get(self, request, plate_number):
         reports_list = list(Report.objects.exclude(plate_number='').filter(plate_number=plate_number))
-        user = _get_authenticated_user_from_cookie(request)
-        reported_by_current_user = False
-        if user is not None:
-            reported_by_current_user = any(r.user_name == user.username for r in reports_list)
         serializer = ReportSerializer(reports_list, many=True)
         return Response({
             'count': len(reports_list),
-            'reported_by_current_user': reported_by_current_user,
             'reports': serializer.data,
         })
+
+class PlateReportedByCurrentUserView(APIView):
+    """
+    GET /api/v1/reports/plates/{plate_number}/reported-by-current-user/ — whether current authenticated user has already reported this plate
+    """
+    def get(self, request, plate_number):
+        user = _get_authenticated_user_from_cookie(request)
+        reported_by_current_user = False
+        if user is not None:
+            reported_by_current_user = Report.objects.exclude(plate_number='').filter(
+                plate_number=plate_number,
+                user_name=user.username,
+            ).exists()
+        return Response({'reported_by_current_user': reported_by_current_user})
 
 class MaxReportedTypeView(APIView):
     """
@@ -313,7 +322,7 @@ class MaxReportedTypeView(APIView):
             result = Report.objects.exclude(offense_type='💬 אחר').values('offense_type').annotate(count=Count('offense_type')).order_by('-count').first()
             if result is None:
                 result = {'offense_type': '', 'count': 0}
-            cache.set('max_reported_type', result, timeout=3600)  # 1 hour cache
+            cache.set('max_reported_type', result, timeout=300)  # 5 minutes cache
         return Response({'maxReported': result})
 
 class AllReportsView(APIView):

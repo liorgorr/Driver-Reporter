@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import AuthStatusView, AuthCsrfView, AuthSignupView, AuthCookieLoginView, AuthCookieLogoutView, MaxReportedPlateView, ReportCreateView, DistinctPlateCountView, ReportCountView, ReportsByPlateView, MaxReportedTypeView, AllReportsView, CheckUsernameView, CurrentUserReportsView, PasswordChangeView
+from .views import AuthStatusView, AuthCsrfView, AuthSignupView, AuthCookieLoginView, AuthCookieLogoutView, MaxReportedPlateView, ReportCreateView, DistinctPlateCountView, ReportCountView, ReportsByPlateView, PlateReportedByCurrentUserView, MaxReportedTypeView, AllReportsView, CheckUsernameView, CurrentUserReportsView, PasswordChangeView
 
 urlpatterns = [
     path('auth/csrf/', AuthCsrfView.as_view(), name='auth-csrf'),
@@ -15,6 +15,7 @@ urlpatterns = [
     path('reports/count/', ReportCountView.as_view(), name='count'),
     path('reports/max-reported-plate/', MaxReportedPlateView.as_view(), name='max-reported-plate'),
     path('reports/plates/<str:plate_number>/', ReportsByPlateView.as_view(), name='reports-by-plate'),
+    path('reports/plates/<str:plate_number>/reported-by-current-user/', PlateReportedByCurrentUserView.as_view(), name='plate-reported-by-current-user'),
     path('reports/max-reported-type/', MaxReportedTypeView.as_view(), name='max-reported-type'),
     path('reports/all/', AllReportsView.as_view(), name='all-reports'),
 ]

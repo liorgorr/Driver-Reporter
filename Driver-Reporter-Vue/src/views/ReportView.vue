@@ -77,7 +77,9 @@ async function validatePlateNumber(plateNumber: string) {
 
   try {
     const res = await fetch(
-      apiUrl(`/api/v1/reports/plates/${encodeURIComponent(normalizedPlate)}/`),
+      apiUrl(
+        `/api/v1/reports/plates/${encodeURIComponent(normalizedPlate)}/reported-by-current-user/`,
+      ),
       {
         method: 'GET',
         credentials: 'include',
